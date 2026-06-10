@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+      Wymuszenie TLS dla całej aplikacji (SPEC_MVP §1: brak czystego HTTP, brak
+      wyłączania weryfikacji certyfikatu). Cleartext zablokowany globalnie.
+      Świadomie BEZ certificate pinningu: pin łatwo „zamurowuje" aplikację przy
+      rotacji certyfikatu GitHub — większe ryzyko niedostępności niż korzyść.
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
