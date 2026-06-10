@@ -62,7 +62,11 @@ class BarometerRepository(
     }
 
     companion object {
-        /** Dane uznajemy za nieaktualne po 45 min (silnik liczy co 30 min). */
-        const val STALE_AFTER_MILLIS: Long = 45L * 60L * 1000L
+        /**
+         * Dane uznajemy za nieaktualne po 90 min. Backend liczy ~raz na godzinę
+         * (cron `17 * * * *`), a appka odświeża co ~60 min — 90 min toleruje pełny
+         * cykl + jitter WorkManagera, a baner pokazuje dopiero realnie stare dane.
+         */
+        const val STALE_AFTER_MILLIS: Long = 90L * 60L * 1000L
     }
 }

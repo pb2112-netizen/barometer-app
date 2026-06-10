@@ -67,13 +67,21 @@ work/         RefreshWorker (pobiera w tle, update widget, logika powiadomień),
 - Repo git w `WorldBarometer/`. Brak globalnej tożsamości git → commituj z inline:
   `git -c user.name="World Barometer Dev" -c user.email="dev@worldbarometer.local" commit ...`
   (NIE modyfikuj globalnego git config).
-- Tagi: **`v0.1.0`** = baseline MVP, **`v0.2.0`** = poprawki bugów (bieżący `main`).
-- Wersja w `app/build.gradle.kts`: versionCode 2, versionName "0.2.0". Przy kolejnych zmianach podbijaj.
+- Tagi: **`v0.1.0`** = baseline MVP, **`v0.2.0`**/`v0.2.1` = poprawki bugów,
+  **`v0.3.0`** = dopasowanie częstotliwości odświeżania do backendu (bieżący `main`).
+- Wersja w `app/build.gradle.kts`: versionCode 4, versionName "0.3.0". Przy kolejnych zmianach podbijaj.
 - Powrót do punktu: `git checkout v0.1.0` / `git checkout main`.
 
-## 6. Stan na teraz (po v0.2.0)
+## 6. Stan na teraz (po v0.3.0)
 
-Zrobione: cały MVP (5 kroków) + hardening + polityka prywatności (Settings) + disclaimer (dashboard)
+Najnowsze (v0.3.0): **dopasowanie częstotliwości odświeżania do backendu** (silnik liczy ~co godzinę).
+- `RefreshScheduler`: interwał WorkManager 15 → **60 min**; polityka `KEEP` → **`UPDATE`**
+  (przy aktualizacji appki nowy interwał podmienia stary plan, nie gubiąc harmonogramu).
+- `BarometerRepository.STALE_AFTER_MILLIS`: 45 → **90 min** (próg „Data may be out of date"
+  dopasowany do cyklu godzinnego — żeby baner nie świecił fałszywie między aktualizacjami).
+- Backend (osobne repo `barometr/`): cron `*/30` → **`17 * * * *`**, wypchnięty na `main`.
+
+Zrobione wcześniej: cały MVP (5 kroków) + hardening + polityka prywatności (Settings) + disclaimer (dashboard)
 + atrybucja źródeł (po rozwinięciu eventu). Poprawione bugi z testów:
 - Sekcja „Top events" zwijalna (domyślnie zwinięta) + karty zwijalne (domyślnie zwinięte).
 - Manualne odświeżanie (pull-to-refresh + przycisk Refresh w app barze).
@@ -86,9 +94,13 @@ Zrobione: cały MVP (5 kroków) + hardening + polityka prywatności (Settings) +
 - **NIE skompilowano w tym środowisku** (brak Android SDK + brak dostępu do pobierania zależności w kontenerze).
   Pierwszy realny build/sync robi użytkownik w Android Studio. Możliwe drobne korekty wersji bibliotek.
 - **gradle-wrapper.jar nie jest commitowany** (binarny) — Android Studio dogeneruje przy otwarciu, lub `gradle wrapper`.
-- **Backend cron:** workflow „Barometr update" działa POPRAWNIE logicznie (1 udany run, AI, poprawny JSON),
-  ale **harmonogram `*/30` jeszcze nie odpalał automatycznie** (tylko ręczny `workflow_dispatch`).
-  Do obserwacji; ew. nudge commitem lub zewnętrzny trigger przez `workflow_dispatch` API.
+- **Backend cron:** workflow „Barometr update" działa POPRAWNIE (silnik + AI + poprawny JSON,
+  potwierdzone udanym `workflow_dispatch`). Harmonogram zmieniony z `*/30` na **`17 * * * *`**
+  (~raz na godzinę, celowo poza pełną godziną — o ":00" GitHub często opóźnia/gubi runy).
+  Zmiana zacommitowana lokalnie w `barometr/` (413802d); **wymaga `git push` na GitHub**, aby
+  cron na default branchu zaczął obowiązywać. Harmonogram GitHuba jest best-effort (bez gwarancji
+  punktualności). UWAGA: „Re-run jobs" odtwarza STARY commit → push może paść (non-fast-forward);
+  do ręcznego testu używać „Run workflow" na `main`, nie „Re-run".
   W workflow jest też nieszkodliwy warning deprecacji Node20 (fix: `env: FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"`).
 
 ## 8. Jak uruchomić (skrót dla usera-amatora)
