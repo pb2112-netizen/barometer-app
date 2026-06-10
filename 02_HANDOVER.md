@@ -1,4 +1,12 @@
-# HANDOVER — World Barometer (Android)
+> ============================================================
+> ## ETAP 2 z 2 — APLIKACJA ANDROID: ZBUDOWANA (MVP + poprawki v0.2.0) ✅
+> 👉 **TO JEST NAJNOWSZY STAN — ZACZNIJ TUTAJ.**
+> NIE zaczynaj od zera: MVP (5 kroków), hardening, polityka prywatności, disclaimer i bugfixy
+> są ZROBIONE. Dalszy rozwój → patrz sekcja 9 „Sensowne następne kroki".
+> Etap 1 (backend + kontrakt danych, tylko do wglądu): **`../barometr/01_START_TUTAJ.md`**.
+> ============================================================
+
+# HANDOVER — World Barometer (Android) — ETAP 2
 
 Dokument przekazania dla nowej sesji/modelu. Czytaj na starcie, zanim zaczniesz kodować.
 Cel projektu: natywna apka Android, która TYLKO pobiera gotowy publiczny JSON i prezentuje
@@ -10,7 +18,7 @@ Cel projektu: natywna apka Android, która TYLKO pobiera gotowy publiczny JSON i
 
 - **Aplikacja Android (ten projekt):** `/workspaces/Agenci_SEO/WorldBarometer/` — osobne repo git.
 - **Backend (silnik, NIE ruszać bez prośby):** `/workspaces/Agenci_SEO/barometr/` — Python + GitHub Actions.
-- **Kontrakt danych i decyzje:** `barometr/START_TUTAJ.md`, `barometr/SPEC_MVP.md`, `barometr/makiety/paleta.json`. **Przeczytaj je.**
+- **Kontrakt danych i decyzje (ETAP 1):** `barometr/01_START_TUTAJ.md`, `barometr/SPEC_MVP.md`, `barometr/makiety/paleta.json`. **Przeczytaj je.**
 - **Endpoint danych (jedyny):** `https://raw.githubusercontent.com/pb2112-netizen/barometr/main/barometer.json`
 - Aplikacja NIE zna żadnego klucza API. Czyta tylko publiczny plik.
 
