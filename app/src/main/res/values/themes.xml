@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme bazowy. Wygląd UI definiuje Compose (Material3) — patrz ui/theme. -->
+    <style name="Theme.WorldBarometer" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
