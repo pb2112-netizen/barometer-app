@@ -42,10 +42,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ustawienia", fontWeight = FontWeight.SemiBold) },
+                title = { Text("Settings", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wstecz")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -65,12 +65,12 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Powiadomienia",
+                        text = "Notifications",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = "Alert przy wzroście powyżej progu (limit: raz na 3 h).",
+                        text = "Alert when the level rises above the threshold (max once per 3 h).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -84,12 +84,12 @@ fun SettingsScreen(
             Spacer(Modifier.height(28.dp))
 
             Text(
-                text = "Próg powiadomień",
+                text = "Notification threshold",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
-                text = String.format(Locale.US, "Wyślij alert, gdy ocena ≥ %.1f", state.threshold),
+                text = String.format(Locale.US, "Send an alert when the score ≥ %.1f", state.threshold),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -105,7 +105,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(28.dp))
 
             Text(
-                text = "Ostatnia aktualizacja danych",
+                text = "Last data update",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -125,7 +125,7 @@ fun SettingsScreen(
 @Composable
 private fun PrivacyPolicySection() {
     Text(
-        text = "Polityka prywatności",
+        text = "Privacy policy",
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.onBackground,
     )
@@ -138,14 +138,13 @@ private fun PrivacyPolicySection() {
 }
 
 private const val PRIVACY_POLICY =
-    "World Barometer nie zbiera, nie przechowuje ani nie udostępnia żadnych danych " +
-        "osobowych. Aplikacja nie wymaga logowania, nie korzysta z lokalizacji, kontaktów " +
-        "ani identyfikatorów reklamowych.\n\n" +
-        "Jedyne połączenie sieciowe to pobranie publicznego pliku z wynikiem " +
-        "(barometer.json) przez HTTPS. Nie wysyłamy żadnych informacji o Tobie ani o " +
-        "Twoim urządzeniu. Ustawienia (próg, przełącznik powiadomień) i ostatni wynik są " +
-        "zapisywane wyłącznie lokalnie na urządzeniu.\n\n" +
-        "Uprawnienia: internet (pobranie danych) oraz powiadomienia (Android 13+). " +
-        "Powiadomienia są generowane lokalnie na telefonie — nie używamy push z serwera.\n\n" +
-        "Treści pochodzą z publicznych źródeł RSS (m.in. BBC, Al Jazeera, The Guardian) " +
-        "i są oceniane automatycznie. Mają charakter informacyjny i mogą zawierać błędy."
+    "World Barometer does not collect, store, or share any personal data. The app " +
+        "requires no sign-in and does not use location, contacts, or advertising identifiers.\n\n" +
+        "The only network connection is downloading a public result file (barometer.json) " +
+        "over HTTPS. We do not send any information about you or your device. Settings " +
+        "(threshold, notifications toggle) and the last result are stored locally on the " +
+        "device only.\n\n" +
+        "Permissions: internet (to fetch data) and notifications (Android 13+). " +
+        "Notifications are generated locally on the phone — we do not use server push.\n\n" +
+        "Content comes from public RSS sources (including BBC, Al Jazeera, The Guardian) " +
+        "and is scored automatically. It is informational and may contain errors."
