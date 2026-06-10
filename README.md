@@ -1,3 +1,10 @@
+<!-- Changelog
+v0.2.0 — poprawki bugów: zwijalna sekcja Top events (domyślnie zwinięta) + zwijalne karty,
+naprawione manualne odświeżanie (pull-to-refresh + przycisk), cała appka po angielsku,
+oznaczenia 1/10 na pasku skali, widget: last update + X/10 (potęga) + komentarz + tap otwiera appkę.
+v0.1.0 — baseline MVP.
+-->
+
 # World Barometer (Android)
 
 Natywna aplikacja Android (Kotlin + Jetpack Compose), która pobiera gotowy plik JSON

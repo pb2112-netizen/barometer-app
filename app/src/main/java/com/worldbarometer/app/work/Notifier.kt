@@ -26,10 +26,10 @@ class Notifier(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Alerty barometru",
+                "Barometer alerts",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Powiadomienia o wzroście poziomu zagrożenia powyżej progu."
+                description = "Notifications when the threat level rises above your threshold."
             }
             val manager = appContext.getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)

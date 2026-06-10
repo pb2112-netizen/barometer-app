@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,20 +48,28 @@ class HomeViewModel(
      * @param manual true dla pull-to-refresh (throttling min. 60 s wg SPEC_MVP §3).
      */
     fun refresh(manual: Boolean) {
-        val now = System.currentTimeMillis()
-        if (manual && now - lastManualRefreshMillis < MANUAL_THROTTLE_MS) return
         if (_uiState.value.isRefreshing) return
-        if (manual) lastManualRefreshMillis = now
+
+        val now = System.currentTimeMillis()
+        val throttled = manual && now - lastManualRefreshMillis < MANUAL_THROTTLE_MS
+        if (manual && !throttled) lastManualRefreshMillis = now
 
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            val result = repository.refresh()
-            _uiState.update {
-                it.copy(
-                    isRefreshing = false,
-                    initialLoad = false,
-                    isOffline = result is BarometerRepository.RefreshResult.Failure,
-                )
+            if (throttled) {
+                // Throttling (min. 60 s) — pokaż krótki feedback zamiast „martwego" gestu,
+                // ale nie odpytuj sieci.
+                delay(700)
+                _uiState.update { it.copy(isRefreshing = false) }
+            } else {
+                val result = repository.refresh()
+                _uiState.update {
+                    it.copy(
+                        isRefreshing = false,
+                        initialLoad = false,
+                        isOffline = result is BarometerRepository.RefreshResult.Failure,
+                    )
+                }
             }
         }
     }

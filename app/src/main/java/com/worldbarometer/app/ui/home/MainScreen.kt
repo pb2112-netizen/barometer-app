@@ -3,6 +3,7 @@ package com.worldbarometer.app.ui.home
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingFlat
@@ -68,8 +70,11 @@ fun MainScreen(
             TopAppBar(
                 title = { Text("World Barometer", fontWeight = FontWeight.SemiBold) },
                 actions = {
+                    IconButton(onClick = { viewModel.refresh(manual = true) }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+                    }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Ustawienia")
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 },
             )
@@ -108,9 +113,9 @@ private fun BarometerContent(state: HomeUiState) {
         if (state.isOffline || state.isStale) {
             StatusBanner(
                 text = if (state.isOffline) {
-                    "Offline — ostatni znany wynik"
+                    "Offline — showing last known result"
                 } else {
-                    "Dane mogą być nieaktualne"
+                    "Data may be out of date"
                 },
             )
             Spacer(Modifier.height(12.dp))
@@ -143,7 +148,7 @@ private fun BarometerContent(state: HomeUiState) {
         }
 
         Text(
-            text = "Aktualizacja: ${RelativeTime.format(data.updatedAt)}",
+            text = "Updated: ${RelativeTime.format(data.updatedAt)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -155,21 +160,50 @@ private fun BarometerContent(state: HomeUiState) {
         Spacer(Modifier.height(20.dp))
 
         if (data.topEvents.isNotEmpty()) {
+            EventsSection(events = data.topEvents)
+        }
+
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+/**
+ * Zwijalna sekcja TOP wydarzeń. Domyślnie ZWINIĘTA (cała sekcja).
+ * Po rozwinięciu pokazuje listę kart — każda karta także domyślnie zwinięta.
+ */
+@Composable
+private fun EventsSection(events: List<TopEvent>) {
+    var sectionExpanded by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth().animateContentSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { sectionExpanded = !sectionExpanded }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(
-                text = "Najważniejsze wydarzenia",
-                modifier = Modifier.fillMaxWidth(),
+                text = "Top events (${events.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
             )
+            Icon(
+                imageVector = if (sectionExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = if (sectionExpanded) "Collapse section" else "Expand section",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (sectionExpanded) {
             Spacer(Modifier.height(8.dp))
-            data.topEvents.forEach { event ->
+            events.forEach { event ->
                 EventCard(event)
                 Spacer(Modifier.height(10.dp))
             }
         }
-
-        Spacer(Modifier.height(12.dp))
     }
 }
 
@@ -210,20 +244,38 @@ private fun LevelPill(label: String, color: Color) {
 @Composable
 private fun ScoreBar(score: Double, color: Color) {
     val fraction = (score / 10.0).coerceIn(0.0, 1.0).toFloat()
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(12.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.outline),
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(fraction)
+                .fillMaxWidth()
                 .height(12.dp)
                 .clip(CircleShape)
-                .background(color),
-        )
+                .background(MaterialTheme.colorScheme.outline),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .height(12.dp)
+                    .clip(CircleShape)
+                    .background(color),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "1",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "10",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -250,37 +302,39 @@ private fun EventCard(event: TopEvent) {
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                if (event.summary.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = event.summary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                // Źródła pojawiają się dopiero po rozwinięciu eventu.
-                if (expanded && event.sources.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "Źródła",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    event.sources.forEach { source ->
+                // Opis i źródła widoczne dopiero po rozwinięciu karty (domyślnie zwinięta).
+                if (expanded) {
+                    if (event.summary.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            text = "• $source",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = event.summary,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    if (event.sources.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Sources",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        event.sources.forEach { source ->
+                            Text(
+                                text = "• $source",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
             Spacer(Modifier.size(8.dp))
             Icon(
                 imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = if (expanded) "Zwiń" else "Rozwiń źródła",
+                contentDescription = if (expanded) "Collapse" else "Expand",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -296,9 +350,9 @@ private fun DisclaimerBox() {
         tonalElevation = 1.dp,
     ) {
         Text(
-            text = "Oceny generowane automatycznie przez AI na podstawie nagłówków RSS. " +
-                "Charakter wyłącznie informacyjny — to nie jest oficjalny komunikat ani porada. " +
-                "Treść może zawierać błędy.",
+            text = "Scores are generated automatically by AI from RSS headlines. " +
+                "For informational purposes only — not an official statement or advice. " +
+                "Content may contain errors.",
             modifier = Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -355,7 +409,7 @@ private fun EmptyState() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "Brak danych. Pociągnij w dół, aby odświeżyć.",
+            text = "No data yet. Pull down to refresh.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
