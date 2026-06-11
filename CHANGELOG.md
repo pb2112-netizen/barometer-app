@@ -7,6 +7,10 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 
 ---
 
+## [proces] — 2026-06-11 — GitHub remote (barometer-app)
+- Docs: repo apki publiczne na GitHub — `pb2112-netizen/barometer-app`; `origin` skonfigurowany,
+  push branch `master` + tagi git (`v0.1.0` … `v0.6.0`). Handover i `PROJECT.md` §7 zaktualizowane.
+
 ## [v0.6.0] — 2026-06-11 — Country lens (WB-008)
 - Added: **Country lens** picker w Settings (Poland, Romania, Portugal, Ukraine, United States).
 - Added: `LensCatalog`, `lens_id` w `SettingsStore`, cache per lens w `BarometerStore`.

@@ -76,13 +76,16 @@ Pola `barometer.json` używane przez UI: `global_score` (1.0–10.0, wielka licz
 `level_label` (Stable/Low/Elevated/High/Critical), `trend` (rising/falling/stable), `short_summary`,
 `top_events[]` (`title`, `summary`, `score`, `sources`), `updated_at` (ISO UTC). Język treści: angielski.
 
-## 7. Wersjonowanie (git, lokalne, bez remote)
+## 7. Wersjonowanie (git)
 
-- Repo git w `WorldBarometer/`. Brak globalnej tożsamości git → commituj z inline:
+- Repo git w `WorldBarometer/`. Remote: `https://github.com/pb2112-netizen/barometer-app.git`
+  (branch `master`). Backend to osobne repo: `github.com/pb2112-netizen/barometr`.
+- Brak globalnej tożsamości git → commituj z inline:
   `git -c user.name="World Barometer Dev" -c user.email="dev@worldbarometer.local" commit ...`
   (NIE modyfikuj globalnego git config).
-- Po paczce poprawek: podbij `versionCode`/`versionName` w `app/build.gradle.kts`, commit, tag (np. `v0.4.0`).
-- Powrót do punktu: `git checkout <tag>` / `git checkout main`. Historia wersji → `CHANGELOG.md`.
+- Po paczce poprawek: podbij `versionCode`/`versionName` w `app/build.gradle.kts`, commit, tag (np. `v0.4.0`),
+  `git push` + `git push origin --tags`.
+- Powrót do punktu: `git checkout <tag>` / `git checkout master`. Historia wersji → `CHANGELOG.md`.
 
 ## 8. Backend — model współpracy (skrót)
 
