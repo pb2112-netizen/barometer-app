@@ -11,7 +11,10 @@ Backend gotowy i nieruszalny bez prośby. Cała aplikacja po angielsku; komentar
 2. **`PROJECT.md`** — stabilna referencja (architektura, stos, decyzje, logika, kontrakt, wersjonowanie).
 3. **`CHANGELOG.md`** — TYLKO gdy potrzebujesz historii/„dlaczego".
 4. **`barometr/01_START_TUTAJ.md`** (+ `SPEC_MVP.md`, `makiety/paleta.json`) — TYLKO gdy zadanie dotyka backendu/danych.
-5. Protokół utrzymania tych dokumentów: `.cursor/rules/handover.mdc`.
+
+Protokół utrzymania tych dokumentów to reguła workspace `.cursor/rules/barometr-handover.mdc`
+(agent-requested) — **wyzwalana hasłem „aplikacja barometr"** na starcie rozmowy. Bez hasła sesja
+jest domyślnie czysta (protokół się nie ładuje).
 
 ## Bieżąca wersja
 - App: **v0.3.0** (versionCode 4, versionName "0.3.0"), tag `v0.3.0` = bieżący `main`.
