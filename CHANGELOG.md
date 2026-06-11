@@ -7,6 +7,19 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 
 ---
 
+## [backend WB-012] — 2026-06-12 — Event summary restore (apka bez zmian kodu)
+- Fixed (silnik `barometr/`): `top_events[].summary` — regresja po multi-lens; fallback + tryb prosty.
+- Docs: weryfikacja u PO po cyklu silnika — rozwinięta karta już renderuje `summary` (`MainScreen.kt`).
+
+## [v0.6.1] — 2026-06-11 — Country lens visibility (WB-011)
+- Added: klikalny chip **Scoring for {Country}** nad score na dashboardzie (`CountryLensChip.kt`);
+  tap → Settings (bez słowa „Lens” w UI głównym).
+- Changed: widget Glance — kraj w lewym dolnym rogu (pin + nazwa); timestamp oddzielony od summary; rozszerzony `contentDescription` (TalkBack).
+- Changed: dashboard — tylko nazwa kraju jest klikalna; prefix „Scoring for:” jako zwykły tekst.
+- Changed: `legal_strings.xml` — privacy: country lens w local storage + opis pliku per lens w Permissions.
+- Changed: `HomeViewModel` obserwuje `lensId` — chip widoczny także przy pierwszym ładowaniu.
+- Changed: próby przyspieszenia widgetu po zmianie kraju — `BarometerWidgetUpdater`, Glance state, `currentSnapshot()` (fix **niesprawdzony u PO**; temat odłożony → `02_HANDOVER.md`).
+
 ## [proces] — 2026-06-11 — GitHub remote (barometer-app)
 - Docs: repo apki publiczne na GitHub — `pb2112-netizen/barometer-app`; `origin` skonfigurowany,
   push branch `master` + tagi git (`v0.1.0` … `v0.6.0`). Handover i `PROJECT.md` §7 zaktualizowane.

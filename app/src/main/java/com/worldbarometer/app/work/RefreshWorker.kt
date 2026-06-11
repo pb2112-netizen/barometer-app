@@ -6,8 +6,7 @@ import androidx.work.WorkerParameters
 import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
-import com.worldbarometer.app.widget.BarometerWidget
-import androidx.glance.appwidget.updateAll
+import com.worldbarometer.app.widget.BarometerWidgetUpdater
 
 /**
  * Jedyne miejsce, które pobiera dane w tle (SPEC_MVP §2: brak ciągłej pracy/wakelocków).
@@ -24,7 +23,7 @@ class RefreshWorker(
 
         return when (val result = repository.refresh()) {
             is BarometerRepository.RefreshResult.Success -> {
-                BarometerWidget().updateAll(applicationContext)
+                BarometerWidgetUpdater.requestUpdate(applicationContext)
                 evaluateNotification(settings, result.snapshot.data.globalScore, result.snapshot)
                 Result.success()
             }

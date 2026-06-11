@@ -25,13 +25,14 @@ komentarze w kodzie mogą być PL. Backend gotowy i **nieruszalny bez prośby**.
 Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-handover`).
 
 ## Bieżąca wersja
-- **App:** v0.6.0 (versionCode 9), tag `v0.6.0`, HEAD `7e8ee56`, branch `master`.
+- **App:** v0.6.1 (versionCode 10), tag `v0.6.1` (do utworzenia po build u PO), branch `master`.
 - **Remote:** `origin` → `https://github.com/pb2112-netizen/barometer-app.git` (public).
 - **Backend:** multi-lens live — `barometer_{pl,ro,pt,ua,us}.json` + `manifest.json`.
 
 ## Stan na teraz
-- **Done:** MVP, Legal (WB-004), widget trend (WB-002), branding (WB-007), country lens (WB-008).
-- **WB-008 zweryfikowane u PO:** picker Settings, zmiana lens → inny score/treść, widget OK.
+- **Done:** MVP, Legal (WB-004), widget trend (WB-002), branding (WB-007), country lens (WB-008), lens visibility (WB-011), **event summary restore (WB-012 — silnik)**.
+- **WB-011 u PO (częściowo):** chip „Scoring for:” + klikalny kraj OK; widget — pin + nazwa kraju w rogu OK.
+- **WB-008 zweryfikowane u PO:** picker Settings, zmiana lens → dashboard OK; widget **wolno / nie reaguje** na zmianę kraju (patrz otwarte problemy).
 - **Silnik:** JSON na GitHubie HTTP 200; cron przez cron-job.org → `workflow_dispatch`.
 - **Repo apki:** git w `WorldBarometer/`, remote skonfigurowany, `master` + tagi na GitHubie.
 - **Build:** tylko u usera w Android Studio — kontener bez Android SDK.
@@ -39,10 +40,19 @@ Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-han
 ## Następne kroki (priorytet ↓)
 1. **Play Store (WB-009+)** — listing EN, Data safety, assety w `design/play-store/`.
 2. **Privacy URL publiczny (WB-010)** — wymagany przed publikacją Store.
-3. Tłumaczenia PL/EN UI; `@Preview`; testy jednostkowe core.
-4. Po zmianach docs: commit + `git push` (+ tag przy nowej wersji apki).
+3. Po build u PO: commit + `git push` + tag `v0.6.1`.
+4. **WB-012 weryfikacja u PO** — po cyklu silnika: rozwinięta karta Top event pokazuje opis nad Sources (apka bez zmian kodu).
+5. Tłumaczenia PL/EN UI; `@Preview`; testy jednostkowe core.
+
+**Do zaadresowania później (nie blokują Store na razie):**
+- **Widget — szybkie odświeżenie po zmianie kraju** (WB-011 follow-up): po wyborze lens w Settings widget
+  aktualizuje się z opóźnieniem lub wcale; dashboard reaguje od razu. Próbowane: `currentSnapshot()`,
+  `BarometerWidgetUpdater`, Glance Widget State (`PreferencesGlanceStateDefinition`), podwójne `update()` z delay —
+  **bez potwierdzonego fix u PO**; dalsze debugowanie wstrzymane. Podejrzenie: limit sesji Glance + launcher/OEM.
+  Pliki: `BarometerWidget.kt`, `BarometerWidgetUpdater.kt`, `BarometerWidgetState.kt`, `SettingsViewModel.setLensId`.
 
 ## Otwarte problemy
+- **Widget nie nadąża za zmianą kraju** — patrz „Do zaadresowania później” wyżej; model telefonu/launcher do ustalenia przy kolejnej sesji.
 - **Build tylko u usera** — brak Android SDK w kontenerze deweloperskim.
 - **`gradle-wrapper.jar` nie w repo** — Android Studio dogeneruje przy sync lub `gradle wrapper`.
 - **PAT cron-job.org wygasa** (backend) — przy 401 odnowić token w repo `barometr`.

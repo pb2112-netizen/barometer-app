@@ -4,16 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
-import androidx.glance.appwidget.updateAll
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
-import com.worldbarometer.app.widget.BarometerWidget
+import com.worldbarometer.app.widget.BarometerWidgetUpdater
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -54,8 +54,12 @@ class SettingsViewModel(
             val current = settingsStore.currentLensId()
             if (current == id) return@launch
             settingsStore.setLensId(id)
+            // 1) Kraj od razu (Glance state, bez czekania na sieć).
+            BarometerWidgetUpdater.requestUpdate(ServiceLocator.applicationContext, lensId = id)
             repository.refresh()
-            BarometerWidget().updateAll(ServiceLocator.applicationContext)
+            // 2) Score/summary po opóźnieniu — Glance odrzuca drugie update() tuż po pierwszym.
+            delay(BarometerWidgetUpdater.GLANCE_SECOND_UPDATE_DELAY_MS)
+            BarometerWidgetUpdater.requestUpdate(ServiceLocator.applicationContext, lensId = id)
         }
     }
 
