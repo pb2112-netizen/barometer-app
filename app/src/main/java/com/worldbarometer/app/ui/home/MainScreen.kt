@@ -91,8 +91,11 @@ fun MainScreen(
                 .padding(innerPadding),
         ) {
             when {
-                state.snapshot != null -> BarometerContent(state)
-                state.initialLoad -> LoadingState()
+                state.snapshot != null -> BarometerContent(state, onOpenSettings)
+                state.initialLoad -> LoadingState(
+                    countryName = LensCatalog.nameFor(state.lensId),
+                    onOpenSettings = onOpenSettings,
+                )
                 else -> EmptyState()
             }
         }
@@ -100,11 +103,12 @@ fun MainScreen(
 }
 
 @Composable
-private fun BarometerContent(state: HomeUiState) {
+private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
     val snapshot = state.snapshot ?: return
     val data = snapshot.data
     val level = snapshot.level
     val levelColor = LevelPalette.color(level)
+    val countryName = data.lensNameEn ?: LensCatalog.nameFor(snapshot.lensId)
 
     Column(
         modifier = Modifier
@@ -123,6 +127,9 @@ private fun BarometerContent(state: HomeUiState) {
             )
             Spacer(Modifier.height(12.dp))
         }
+
+        CountryLensChip(countryName = countryName, onClick = onOpenSettings)
+        Spacer(Modifier.height(12.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -149,15 +156,6 @@ private fun BarometerContent(state: HomeUiState) {
             )
             Spacer(Modifier.height(8.dp))
         }
-
-        val lensName = data.lensNameEn
-            ?: LensCatalog.nameFor(snapshot.lensId)
-        Text(
-            text = "Lens: $lensName",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
 
         Text(
             text = "Updated: ${RelativeTime.format(data.updatedAt)}",
@@ -413,8 +411,19 @@ private fun StatusBanner(text: String) {
 }
 
 @Composable
-private fun LoadingState() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+private fun LoadingState(
+    countryName: String,
+    onOpenSettings: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CountryLensChip(countryName = countryName, onClick = onOpenSettings)
+        Spacer(Modifier.height(24.dp))
         CircularProgressIndicator()
     }
 }

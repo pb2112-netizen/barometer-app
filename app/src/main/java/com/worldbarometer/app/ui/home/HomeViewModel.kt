@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import com.worldbarometer.app.core.LensCatalog
+import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
 import kotlinx.coroutines.delay
@@ -19,10 +21,12 @@ data class HomeUiState(
     val isStale: Boolean = false,
     val isOffline: Boolean = false,
     val initialLoad: Boolean = true,
+    val lensId: String = LensCatalog.DEFAULT_LENS_ID,
 )
 
 class HomeViewModel(
     private val repository: BarometerRepository,
+    private val settingsStore: SettingsStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -31,6 +35,11 @@ class HomeViewModel(
     private var lastManualRefreshMillis = 0L
 
     init {
+        viewModelScope.launch {
+            settingsStore.lensId.collect { lensId ->
+                _uiState.update { it.copy(lensId = lensId) }
+            }
+        }
         viewModelScope.launch {
             repository.observe().collect { snapshot ->
                 _uiState.update {
@@ -80,7 +89,10 @@ class HomeViewModel(
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
-                return HomeViewModel(ServiceLocator.repository) as T
+                return HomeViewModel(
+                    ServiceLocator.repository,
+                    ServiceLocator.settingsStore,
+                ) as T
             }
         }
     }

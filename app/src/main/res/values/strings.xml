@@ -3,4 +3,6 @@
     <string name="app_name">World Barometer</string>
     <string name="settings_country_lens_title">Country lens</string>
     <string name="settings_country_lens_description">Scores reflect how world events may affect daily life in the selected country. This is not your physical location — the app does not use GPS.</string>
+    <string name="scoring_for_prefix">Scoring for:</string>
+    <string name="scoring_for_content_description">Scoring for %1$s. Tap to change country.</string>
 </resources>

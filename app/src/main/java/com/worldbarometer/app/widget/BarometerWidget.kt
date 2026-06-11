@@ -16,6 +16,10 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
+import androidx.datastore.preferences.core.Preferences
+import androidx.glance.appwidget.state.getAppWidgetState
+import androidx.glance.state.GlanceStateDefinition
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -26,18 +30,20 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.worldbarometer.app.MainActivity
 import com.worldbarometer.app.R
+import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
-import kotlinx.coroutines.flow.first
 import java.util.Locale
 
 /** Wysokość cyfry score — ikona trendu ma ten sam rozmiar wizualny. */
@@ -50,28 +56,46 @@ private val TrendIconSize = 34.dp
  */
 class BarometerWidget : GlanceAppWidget() {
 
+    override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = ServiceLocator.ensureInitialized(context)
-        val snapshot = repository.observe().first()
+        val glanceState = getAppWidgetState<Preferences>(context, id)
+        val lensId = glanceState[BarometerWidgetStateKeys.LENS_ID]
+            ?: ServiceLocator.settingsStore.currentLensId()
+        val countryName = glanceState[BarometerWidgetStateKeys.COUNTRY_NAME]
+            ?: LensCatalog.nameFor(lensId)
+        val snapshot = repository.currentSnapshot()
         provideContent {
-            WidgetContent(snapshot)
+            WidgetContent(snapshot = snapshot, countryName = countryName)
         }
     }
 }
 
 @Composable
-private fun WidgetContent(snapshot: BarometerRepository.Snapshot?) {
+private fun WidgetContent(
+    snapshot: BarometerRepository.Snapshot?,
+    countryName: String,
+) {
     val level = snapshot?.level ?: Level.STABLE
     val scoreText = snapshot?.let { String.format(Locale.US, "%.1f", it.data.globalScore) } ?: "—"
     val summary = snapshot?.data?.shortSummary.orEmpty()
+    val context = LocalContext.current
     val updatedText = snapshot?.let { "Updated ${RelativeTime.format(it.data.updatedAt)}" } ?: ""
     val white = ColorProvider(Color.White)
-    val context = LocalContext.current
+    val widgetDescription = buildWidgetContentDescription(
+        snapshot = snapshot,
+        scoreText = scoreText,
+        levelLabel = level.label,
+        countryName = countryName,
+        updatedText = updatedText,
+    )
 
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(ImageProvider(backgroundFor(level)))
+            .semantics { contentDescription = widgetDescription }
             .clickable(actionStartActivity(Intent(context, MainActivity::class.java)))
             .padding(14.dp),
     ) {
@@ -106,13 +130,22 @@ private fun WidgetContent(snapshot: BarometerRepository.Snapshot?) {
                 }
 
                 if (updatedText.isNotBlank()) {
-                    Spacer(GlanceModifier.height(4.dp))
+                    Spacer(GlanceModifier.height(8.dp))
                     Text(
                         text = updatedText,
                         style = TextStyle(color = white, fontSize = 10.sp),
                         maxLines = 1,
                     )
                 }
+            }
+        }
+
+        if (countryName.isNotBlank()) {
+            Box(
+                modifier = GlanceModifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomStart,
+            ) {
+                CountryBadgeGlance(countryName = countryName)
             }
         }
 
@@ -124,6 +157,25 @@ private fun WidgetContent(snapshot: BarometerRepository.Snapshot?) {
                 TrendIconGlance(trend = snapshot.trend)
             }
         }
+    }
+}
+
+@Composable
+private fun CountryBadgeGlance(countryName: String) {
+    val white = ColorProvider(Color.White)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            provider = ImageProvider(R.drawable.ic_location_pin),
+            contentDescription = null,
+            modifier = GlanceModifier.size(12.dp),
+            colorFilter = ColorFilter.tint(white),
+        )
+        Spacer(GlanceModifier.size(4.dp))
+        Text(
+            text = countryName,
+            style = TextStyle(color = white, fontSize = 10.sp, fontWeight = FontWeight.Medium),
+            maxLines = 1,
+        )
     }
 }
 
@@ -140,6 +192,18 @@ private fun TrendIconGlance(trend: Trend) {
         modifier = GlanceModifier.size(TrendIconSize),
         colorFilter = ColorFilter.tint(ColorProvider(Color.White)),
     )
+}
+
+private fun buildWidgetContentDescription(
+    snapshot: BarometerRepository.Snapshot?,
+    scoreText: String,
+    levelLabel: String,
+    countryName: String,
+    updatedText: String,
+): String {
+    if (snapshot == null) return "World Barometer"
+    val updatedPart = updatedText.removePrefix("Updated ").lowercase(Locale.US)
+    return "World Barometer $scoreText ${levelLabel.lowercase(Locale.US)}, for $countryName, updated $updatedPart"
 }
 
 private fun backgroundFor(level: Level): Int = when (level) {

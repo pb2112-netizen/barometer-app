@@ -8,6 +8,7 @@ import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.model.BarometerData
 import com.worldbarometer.app.data.remote.BarometerApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
@@ -40,15 +41,22 @@ class BarometerRepository(
         data class Failure(val cause: Throwable) : RefreshResult
     }
 
-    fun observe(): Flow<Snapshot?> = settingsStore.lensId.flatMapLatest { lensId ->
-        store.snapshot(lensId).map { cached ->
-            cached?.let {
-                runCatching {
-                    val data = json.decodeFromString(BarometerData.serializer(), it.rawJson).sanitized()
-                    Snapshot(data, it.fetchedAtMillis, lensId)
-                }.getOrNull()
-            }
+    /** Jednorazowy odczyt cache dla aktywnego lensu — bez wyścigu flatMapLatest (widget). */
+    suspend fun currentSnapshot(): Snapshot? {
+        val lensId = settingsStore.currentLensId()
+        return decodeSnapshot(lensId, store.snapshot(lensId).first())
+    }
+
+    private fun decodeSnapshot(lensId: String, cached: BarometerStore.CachedSnapshot?): Snapshot? =
+        cached?.let {
+            runCatching {
+                val data = json.decodeFromString(BarometerData.serializer(), it.rawJson).sanitized()
+                Snapshot(data, it.fetchedAtMillis, lensId)
+            }.getOrNull()
         }
+
+    fun observe(): Flow<Snapshot?> = settingsStore.lensId.flatMapLatest { lensId ->
+        store.snapshot(lensId).map { cached -> decodeSnapshot(lensId, cached) }
     }
 
     suspend fun refresh(): RefreshResult {
