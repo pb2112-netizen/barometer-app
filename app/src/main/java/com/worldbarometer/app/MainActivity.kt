@@ -19,10 +19,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.worldbarometer.app.ui.home.MainScreen
+import com.worldbarometer.app.ui.legal.LegalAboutScreen
 import com.worldbarometer.app.ui.settings.SettingsScreen
 import com.worldbarometer.app.ui.theme.BarometerTheme
 
-private enum class Screen { HOME, SETTINGS }
+private enum class Screen { HOME, SETTINGS, LEGAL }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +47,11 @@ private fun AppRoot() {
 
     when (screen) {
         Screen.HOME -> MainScreen(onOpenSettings = { screen = Screen.SETTINGS })
-        Screen.SETTINGS -> SettingsScreen(onBack = { screen = Screen.HOME })
+        Screen.SETTINGS -> SettingsScreen(
+            onBack = { screen = Screen.HOME },
+            onOpenLegal = { screen = Screen.LEGAL },
+        )
+        Screen.LEGAL -> LegalAboutScreen(onBack = { screen = Screen.SETTINGS })
     }
 }
 

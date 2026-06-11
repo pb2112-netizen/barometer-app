@@ -7,6 +7,45 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 
 ---
 
+## [v0.6.0] — 2026-06-11 — Country lens (WB-008)
+- Added: **Country lens** picker w Settings (Poland, Romania, Portugal, Ukraine, United States).
+- Added: `LensCatalog`, `lens_id` w `SettingsStore`, cache per lens w `BarometerStore`.
+- Changed: `BarometerApi` — dynamiczny URL `barometer_{lens}.json`; `BarometerRepository` reaguje na zmianę lens.
+- Changed: Legal/About — usunięto „planned”, dodano listę krajów i info o pliku per lens.
+- Changed: Home — dyskretna linia „Lens: …” pod summary.
+- Docs: `02_HANDOVER.md` zaktualizowany. Wymaga deploy silnika przed testem u PO.
+
+## [proces] — 2026-06-11 — Monorepo lokalne `WB/`
+- Docs: `WorldBarometer`, `barometr`, `Tasks` przeniesione do `WB/`; `WB/README.md`, zaktualizowane
+  ścieżki w handover, `PROJECT.md`, regule `.cursor/rules/barometr-handover.mdc`. Git remote bez zmian.
+
+## [v0.5.1] — 2026-06-11 — Launcher icon fix (pixel-perfect PNG)
+- Fixed: adaptive icon foreground = wycięty bitmap z `world_barometer_logo_calm_water_v1.png`
+  (zamiast uproszczonego wektora); tło `#FDFAF4` dopasowane do PNG.
+- Changed: assety Play Store wygenerowane z tego samego wycięcia.
+
+## [v0.5.0] — 2026-06-11 — Branding (calm water logo)
+- Changed: adaptive launcher icon — ciepłe tło kremowe + wektor fal wody (opcja C).
+- Changed: cieplejszy `NeutralPalette`, `BrandPalette`, `primary` = calm teal (Settings switch/slider).
+- Changed: disclaimer i karty eventów — zaokrąglenie 16 dp, ciepły disclaimer (light).
+- Added: `design/source_logo_calm_water_v1.png`, `design/play-store/ic_launcher_play_512.png`,
+  `feature_graphic_1024x500.png`.
+- Changed: ikona powiadomienia (`ic_stat_barometer`) — uproszczona fala.
+- Unchanged: kolory poziomów alertu (`LevelPalette`) i gradienty widgetu.
+
+## [v0.4.1] — 2026-06-11 — Widget trend icon
+- Added: biała ikona trendu (↑/↓/→) w widgecie Glance; `ic_trend_rising`,
+  `ic_trend_falling`, `ic_trend_stable`; źródło `Snapshot.trend` (bez dodatkowej sieci).
+- Changed: ikona trendu — prawy górny róg widgetu, rozmiar 34 dp (jak cyfra score).
+
+## [v0.4.0] — 2026-06-11 — Legal & About screen
+- Added: ekran **Legal & About** (`ui/legal/LegalAboutScreen.kt`) — About, Privacy, MIT license,
+  Content &amp; sources, Contact, wersja apki; wejście z Settings.
+- Added: `LICENSE` (MIT), `legal_strings.xml`, `core/LegalLinks.kt`, `core/OpenExternal.kt`.
+- Changed: Settings — tylko ustawienia funkcjonalne + link do Legal (usunięto pełną politykę z Settings).
+- Changed: nawigacja `HOME → SETTINGS → LEGAL`; `buildConfig` dla stopki wersji.
+- Docs: README — badge MIT + sekcja licencji.
+
 ## [proces] — 2026-06-11 — System handoveru
 - Docs: rozdzielono dokumentację na trzy role: `02_HANDOVER.md` (żywy stan, mały),
   `PROJECT.md` (stabilna referencja), `CHANGELOG.md` (historia). Protokół aktualizacji

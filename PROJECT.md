@@ -12,11 +12,15 @@ Bieżący stan i następne kroki → `02_HANDOVER.md`. Historia → `CHANGELOG.m
 
 ## 2. Gdzie co jest
 
-- **Aplikacja Android (ten projekt):** `/workspaces/Agenci_SEO/WorldBarometer/` — osobne repo git.
-- **Backend (silnik):** `/workspaces/Agenci_SEO/barometr/` — Python + GitHub Actions. Osobne repo
-  (remote: `github.com/pb2112-netizen/barometr`). Kontrakt/decyzje backendu: `barometr/01_START_TUTAJ.md`,
-  `barometr/SPEC_MVP.md`, `barometr/makiety/paleta.json` — czytaj TYLKO gdy zadanie dotyka backendu/danych.
-- **Endpoint danych (jedyny):** `https://raw.githubusercontent.com/pb2112-netizen/barometr/main/barometer.json`
+- **Monorepo lokalne:** `/workspaces/Agenci_SEO/WB/` (Windows: `E:\AI\Agenci_SEO\WB\`). Wszystkie pliki WB
+  (apka, silnik, zadania, assety) — **tylko** w tym drzewie; indeks: `WB/README.md`.
+- **Aplikacja Android (ten projekt):** `WB/WorldBarometer/` — osobne repo git.
+- **Backend (silnik):** `WB/barometr/` — Python + GitHub Actions. Osobne repo
+  (remote: `github.com/pb2112-netizen/barometr`). Kontrakt: `../barometr/01_START_TUTAJ.md`,
+  `SPEC_MVP.md`, `makiety/paleta.json` — TYLKO gdy zadanie dotyka backendu/danych.
+- **Zadania / specyfikacje:** `WB/Tasks/` (np. `WB-004_*.md`, `Tasks/assets/`).
+- **Endpoint danych:** `https://raw.githubusercontent.com/pb2112-netizen/barometr/main/barometer_{lens}.json`
+  (5 lensów: pl, ro, pt, ua, us; alias `barometer.json` = PL). Szczegóły: `../barometr/01_START_TUTAJ.md` §2.
 
 ## 3. Stos i decyzje techniczne (trzymaj się ich)
 
@@ -33,7 +37,8 @@ Bieżący stan i następne kroki → `02_HANDOVER.md`. Historia → `CHANGELOG.m
 
 ```
 core/         Level (mapowanie label/score), LevelPalette+NeutralPalette (z paleta.json),
-              RelativeTime (czas wzgl., EN), ContentSafety (sanityzacja niezaufanego JSON)
+              BrandPalette (akcenty spokoju — nie poziomy alertu), RelativeTime, ContentSafety,
+              LegalLinks, OpenExternal (stałe URL/mail, Intent bez WebView)
 data/model/   BarometerData, TopEvent (@Serializable, 1:1 z barometer.json)
 data/remote/  BarometerApi (OkHttp, limit 256 KB)
 data/local/   BarometerStore (cache wyniku), SettingsStore (próg, on/off, stan powiadomień)
@@ -41,6 +46,7 @@ data/repo/    BarometerRepository (refresh()+observe(), Snapshot{level,trend,isS
 di/           ServiceLocator (repository, settingsStore; init w BarometerApp)
 ui/home/      MainScreen (dashboard), HomeViewModel
 ui/settings/  SettingsScreen, SettingsViewModel
+ui/legal/     LegalAboutScreen (privacy, MIT, sources, contact)
 ui/theme/     BarometerTheme (light/dark)
 widget/       BarometerWidget (Glance), BarometerWidgetReceiver
 work/         RefreshWorker (pobiera w tle, update widget, logika powiadomień),

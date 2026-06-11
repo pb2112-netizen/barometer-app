@@ -18,6 +18,8 @@ data class BarometerData(
     val trend: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
     @SerialName("liczba_naglowkow") val headlineCount: Int = 0,
+    @SerialName("lens_id") val lensId: String? = null,
+    @SerialName("lens_name_en") val lensNameEn: String? = null,
 )
 
 @Serializable

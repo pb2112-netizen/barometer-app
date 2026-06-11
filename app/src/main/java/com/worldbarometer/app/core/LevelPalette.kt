@@ -41,18 +41,18 @@ object LevelPalette {
 /** Kolory neutralne (tło/tekst/karta/obrys) dla trybu light i dark. */
 object NeutralPalette {
     object Light {
-        val background = Color(0xFFFCF8FA)
+        val background = BrandPalette.warmCream
         val text = Color(0xFF1B1B1D)
         val textSecondary = Color(0xFF45464D)
-        val card = Color(0xFFFFFFFF)
-        val outline = Color(0xFFE2E8F0)
+        val card = BrandPalette.warmCard
+        val outline = BrandPalette.warmSand
     }
 
     object Dark {
-        val background = Color(0xFF020617)
+        val background = Color(0xFF0C1218)
         val text = Color(0xFFF3F0F2)
         val textSecondary = Color(0xFF94A3B8)
-        val card = Color(0xFF1E293B)
-        val outline = Color(0xFF334155)
+        val card = Color(0xFF1A2229)
+        val outline = Color(0xFF3D454C)
     }
 }

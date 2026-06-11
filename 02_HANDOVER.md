@@ -6,35 +6,42 @@
 Cel: natywna apka Android, która TYLKO pobiera publiczny JSON i prezentuje „barometr" świata.
 Backend gotowy i nieruszalny bez prośby. Cała aplikacja po angielsku; komentarze w kodzie mogą być PL.
 
+## Lokalna struktura (`WB/`)
+
+| Folder | Rola |
+|--------|------|
+| `WB/WorldBarometer/` | **Ta apka** (Android Studio → Open ten folder) |
+| `WB/barometr/` | Silnik, JSON, GitHub Actions |
+| `WB/Tasks/` | Specyfikacje WB-00x, assety (`Tasks/assets/`) |
+
+Ścieżki: Windows `E:\AI\Agenci_SEO\WB\` · kontener `/workspaces/Agenci_SEO/WB/`
+
 ## Read order (start sesji)
 1. **Ten plik** (cały) — stan + następne kroki + otwarte problemy.
 2. **`PROJECT.md`** — stabilna referencja (architektura, stos, decyzje, logika, kontrakt, wersjonowanie).
 3. **`CHANGELOG.md`** — TYLKO gdy potrzebujesz historii/„dlaczego".
-4. **`barometr/01_START_TUTAJ.md`** (+ `SPEC_MVP.md`, `makiety/paleta.json`) — TYLKO gdy zadanie dotyka backendu/danych.
+4. **`../barometr/01_START_TUTAJ.md`** — TYLKO gdy zadanie dotyka backendu.
 
-Protokół utrzymania tych dokumentów to reguła workspace `.cursor/rules/barometr-handover.mdc`
-(MANUALNA) — **przywoływana wzmianką `@barometr-handover`** na starcie rozmowy. Bez przywołania
-sesja jest domyślnie czysta (zero śladu, protokół się nie ładuje).
+Protokół dokumentacji: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-handover`).
 
 ## Bieżąca wersja
-- App: **v0.3.0** (versionCode 4, versionName "0.3.0"), tag `v0.3.0` = bieżący `main`.
-- Backend: silnik liczy ~co godzinę; uruchamiany zewnętrznym triggerem (cron-job.org), działa.
+- App: **v0.6.0** (versionCode 9, versionName "0.6.0").
+- Backend: multi-lens (5 krajów), batched AI call, manifest.json — **WB-008 wdrożone lokalnie**.
 
 ## Stan na teraz
-- MVP (5 kroków) + hardening + privacy + disclaimer + atrybucja źródeł — **gotowe**.
-- Odświeżanie dopasowane do backendu: WorkManager 60 min (`UPDATE`), próg stale 90 min.
-- Backend stabilny: cron `17 * * * *` (+ zewnętrzny trigger jako realny napęd), push utwardzony.
-- Aplikacja **nieskompilowana w kontenerze** (brak Android SDK) — build robi user w Android Studio.
+- **WB-008 Country lens:** picker w Settings (PL, RO, PT, UA, US), cache per lens, dynamiczny URL, widget + Legal zaktualizowane.
+- MVP + Legal + widget trend + branding — gotowe.
+- Build w Android Studio u usera — kontener bez Android SDK.
+- **Deploy silnika:** przed testem apki u PO — wypchnąć `barometr/` na GitHub (5 plików JSON live).
 
-## Następne kroki (priorytet malejąco; do uzgodnienia)
-1. Tłumaczenia PL/EN przez `res/values/strings.xml` (teraz teksty EN wpisane w kodzie — do ekstrakcji).
-2. `@Preview` dla ekranów (podgląd UI bez emulatora).
-3. Testy jednostkowe: `Level.resolve`, `ContentSafety.sanitized`, logika powiadomień, `RelativeTime`.
-4. Ikona launchera (obecnie prosty wektor) + grafiki do Google Play.
-5. Publikacja: Play Console, podpis (Play App Signing), polityka prywatności jako URL, Data safety, ocena treści.
-6. Ew. „tap widgetu = odświeżenie" jako osobna akcja (kod był w `RefreshWidgetAction`, usunięty w v0.2.0).
+## Następne kroki (priorytet malejąco)
+1. PO: push `barometr/` → workflow_dispatch → weryfikacja 5× HTTP 200 na raw.githubusercontent.com.
+2. PO: build v0.6.0 w Android Studio, test zmiany lens → inny score.
+3. Tłumaczenia PL/EN UI; `@Preview`; testy jednostkowe core.
+4. Publikacja Play (WB-009 privacy URL, Data safety).
 
-## Otwarte problemy (tylko NIEROZWIĄZANE)
-- **Build tylko u usera:** kontener nie ma Android SDK ani dostępu do zależności — możliwe drobne korekty wersji bibliotek przy pierwszym sync.
-- **`gradle-wrapper.jar` nie jest commitowany** (binarny) — Android Studio dogeneruje przy otwarciu, lub `gradle wrapper`.
-- **PAT do triggera backendu wygasa** (cron-job.org) — przy 401 w logach odnowić token (scope Actions: read/write, tylko repo `barometr`).
+## Otwarte problemy
+- **Build tylko u usera:** brak Android SDK w kontenerze.
+- **`gradle-wrapper.jar` nie commitowany** — AS dogeneruje lub `gradle wrapper`.
+- **PAT cron-job.org wygasa** — przy 401 odnowić token (repo `barometr`).
+- **JSON multi-lens na GitHub:** lokalnie wygenerowane — wymaga push + workflow przed testem apki u PO.

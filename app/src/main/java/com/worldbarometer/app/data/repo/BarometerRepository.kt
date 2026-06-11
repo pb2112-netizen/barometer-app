@@ -4,28 +4,29 @@ import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.core.sanitized
 import com.worldbarometer.app.data.local.BarometerStore
+import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.model.BarometerData
 import com.worldbarometer.app.data.remote.BarometerApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 
 /**
- * Łączy sieć (BarometerApi) z lokalnym cache (BarometerStore).
- * - refresh(): pobiera świeże dane i zapisuje do cache.
- * - observe(): strumień ostatniego znanego wyniku (zasila UI i widget; działa offline).
+ * Łączy sieć (BarometerApi) z lokalnym cache (BarometerStore) per lens.
  */
 class BarometerRepository(
     private val api: BarometerApi,
     private val store: BarometerStore,
+    private val settingsStore: SettingsStore,
     private val json: Json,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
 
-    /** Gotowy do prezentacji wynik + metadane (poziom, trend, wiek danych). */
     data class Snapshot(
         val data: BarometerData,
         val fetchedAtMillis: Long,
+        val lensId: String,
     ) {
         val level: Level get() = Level.resolve(data.levelLabel, data.globalScore)
         val trend: Trend get() = Trend.fromString(data.trend)
@@ -39,34 +40,33 @@ class BarometerRepository(
         data class Failure(val cause: Throwable) : RefreshResult
     }
 
-    /** Ostatni znany wynik z cache (null = brak danych jeszcze nie pobranych). */
-    fun observe(): Flow<Snapshot?> = store.snapshot.map { cached ->
-        cached?.let {
-            runCatching {
-                val data = json.decodeFromString(BarometerData.serializer(), it.rawJson).sanitized()
-                Snapshot(data, it.fetchedAtMillis)
-            }.getOrNull()
+    fun observe(): Flow<Snapshot?> = settingsStore.lensId.flatMapLatest { lensId ->
+        store.snapshot(lensId).map { cached ->
+            cached?.let {
+                runCatching {
+                    val data = json.decodeFromString(BarometerData.serializer(), it.rawJson).sanitized()
+                    Snapshot(data, it.fetchedAtMillis, lensId)
+                }.getOrNull()
+            }
         }
     }
 
-    suspend fun refresh(): RefreshResult = when (val result = api.fetch()) {
-        is BarometerApi.Result.Success -> {
-            val millis = now()
-            val data = result.data.sanitized()
-            val raw = json.encodeToString(BarometerData.serializer(), data)
-            store.save(raw, millis)
-            RefreshResult.Success(Snapshot(data, millis))
-        }
+    suspend fun refresh(): RefreshResult {
+        val lensId = settingsStore.currentLensId()
+        return when (val result = api.fetch(lensId)) {
+            is BarometerApi.Result.Success -> {
+                val millis = now()
+                val data = result.data.sanitized()
+                val raw = json.encodeToString(BarometerData.serializer(), data)
+                store.save(lensId, raw, millis)
+                RefreshResult.Success(Snapshot(data, millis, lensId))
+            }
 
-        is BarometerApi.Result.Error -> RefreshResult.Failure(result.cause)
+            is BarometerApi.Result.Error -> RefreshResult.Failure(result.cause)
+        }
     }
 
     companion object {
-        /**
-         * Dane uznajemy za nieaktualne po 90 min. Backend liczy ~raz na godzinę
-         * (cron `17 * * * *`), a appka odświeża co ~60 min — 90 min toleruje pełny
-         * cykl + jitter WorkManagera, a baner pokazuje dopiero realnie stare dane.
-         */
         const val STALE_AFTER_MILLIS: Long = 90L * 60L * 1000L
     }
 }

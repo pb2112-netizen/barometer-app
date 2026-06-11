@@ -7,6 +7,8 @@ v0.1.0 — baseline MVP.
 
 # World Barometer (Android)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Natywna aplikacja Android (Kotlin + Jetpack Compose), która pobiera gotowy plik JSON
 z publicznego URL i prezentuje globalny „barometr" sytuacji. **Aplikacja nie zna żadnego
 klucza API** — czyta wyłącznie publiczny plik wygenerowany przez backend.
@@ -28,7 +30,7 @@ https://raw.githubusercontent.com/pb2112-netizen/barometr/main/barometer.json
 - minSdk 26, target/compileSdk 35
 
 ## Uruchomienie
-1. Otwórz folder `WorldBarometer/` w Android Studio (generuje `gradle-wrapper.jar`
+1. Otwórz folder `WB/WorldBarometer/` w Android Studio (generuje `gradle-wrapper.jar`
    oraz `local.properties` z `sdk.dir`).
 2. Alternatywnie z CLI: `gradle wrapper` (raz), potem `./gradlew assembleDebug`.
 3. Zainstaluj na urządzeniu/emulatorze: `./gradlew installDebug`.
@@ -48,7 +50,11 @@ https://raw.githubusercontent.com/pb2112-netizen/barometr/main/barometer.json
 - **Brak sekretów / minimalne uprawnienia**: aplikacja nie zna żadnego klucza API; tylko `INTERNET`, `ACCESS_NETWORK_STATE`, `POST_NOTIFICATIONS`.
 - **Brak wykonywalnej treści**: render wyłącznie przez `Text` (zero WebView/HTML/auto-linkify).
 - **Łańcuch dostaw**: wersje zależności przypięte w `gradle/libs.versions.toml`; zalecany audyt + Gradle dependency verification.
-- **Transparentność (wymogi Google Play)**: w aplikacji jest polityka prywatności (zakładka Ustawienia), disclaimer na ekranie głównym oraz atrybucja źródeł (po rozwinięciu eventu).
+- **Transparentność (wymogi Google Play)**: ekran Legal &amp; About (Ustawienia → Legal &amp; About), disclaimer na ekranie głównym oraz atrybucja źródeł (po rozwinięciu eventu).
+
+## Licencja
+
+Kod aplikacji Android jest udostępniany na licencji [MIT](LICENSE).
 
 ## Status MVP
 - [x] Fundament projektu (Gradle, manifest, uprawnienia)

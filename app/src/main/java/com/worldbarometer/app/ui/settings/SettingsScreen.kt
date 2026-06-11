@@ -1,5 +1,6 @@
 package com.worldbarometer.app.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,10 +13,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -23,21 +29,29 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.worldbarometer.app.R
+import com.worldbarometer.app.core.LensCatalog
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenLegal: () -> Unit,
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var lensMenuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -58,6 +72,50 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
+            Text(
+                text = stringResource(R.string.settings_country_lens_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = stringResource(R.string.settings_country_lens_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            ExposedDropdownMenuBox(
+                expanded = lensMenuExpanded,
+                onExpandedChange = { lensMenuExpanded = it },
+            ) {
+                OutlinedTextField(
+                    value = LensCatalog.nameFor(state.lensId),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Country") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = lensMenuExpanded) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                )
+                ExposedDropdownMenu(
+                    expanded = lensMenuExpanded,
+                    onDismissRequest = { lensMenuExpanded = false },
+                ) {
+                    LensCatalog.ALL.forEach { lens ->
+                        DropdownMenuItem(
+                            text = { Text(lens.nameEn) },
+                            onClick = {
+                                lensMenuExpanded = false
+                                viewModel.setLensId(lens.id)
+                            },
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(28.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -97,7 +155,6 @@ fun SettingsScreen(
                 value = state.threshold.toFloat(),
                 onValueChange = { viewModel.setThreshold(it.toDouble()) },
                 valueRange = 1f..10f,
-                // 18 kroków co 0.5 w zakresie 1..10
                 steps = 17,
                 enabled = state.notificationsEnabled,
             )
@@ -117,34 +174,31 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(28.dp))
 
-            PrivacyPolicySection()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenLegal),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.legal_settings_entry_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = stringResource(R.string.legal_settings_entry_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
-
-@Composable
-private fun PrivacyPolicySection() {
-    Text(
-        text = "Privacy policy",
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onBackground,
-    )
-    Spacer(Modifier.height(6.dp))
-    Text(
-        text = PRIVACY_POLICY,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-private const val PRIVACY_POLICY =
-    "World Barometer does not collect, store, or share any personal data. The app " +
-        "requires no sign-in and does not use location, contacts, or advertising identifiers.\n\n" +
-        "The only network connection is downloading a public result file (barometer.json) " +
-        "over HTTPS. We do not send any information about you or your device. Settings " +
-        "(threshold, notifications toggle) and the last result are stored locally on the " +
-        "device only.\n\n" +
-        "Permissions: internet (to fetch data) and notifications (Android 13+). " +
-        "Notifications are generated locally on the phone — we do not use server push.\n\n" +
-        "Content comes from public RSS sources (including BBC, Al Jazeera, The Guardian) " +
-        "and is scored automatically. It is informational and may contain errors."
