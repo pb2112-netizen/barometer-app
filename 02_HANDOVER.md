@@ -94,17 +94,17 @@ Zrobione wcześniej: cały MVP (5 kroków) + hardening + polityka prywatności (
 - **NIE skompilowano w tym środowisku** (brak Android SDK + brak dostępu do pobierania zależności w kontenerze).
   Pierwszy realny build/sync robi użytkownik w Android Studio. Możliwe drobne korekty wersji bibliotek.
 - **gradle-wrapper.jar nie jest commitowany** (binarny) — Android Studio dogeneruje przy otwarciu, lub `gradle wrapper`.
-- **Backend cron — NIE odpala się automatycznie (otwarte):** workflow „Barometr update" działa
-  POPRAWNIE przy ręcznym `workflow_dispatch` (silnik + AI + JSON + push OK). Harmonogram to
-  **`17 * * * *`** (~co godzinę), workflow `state: active`, plik na `main`, składnia OK — a mimo to
-  przez ~10h **0 uruchomień z `schedule`** (GitHub po cichu pomija/gubi zaplanowane runy; nawet nie
-  tworzy wpisu w historii). To znana bolączka świeżych repo; NIE da się naprawić w pliku workflow.
-  **Realny fix = zewnętrzny trigger** (np. cron-job.org → `workflow_dispatch` API z fine-grained PAT,
-  scope Actions: read/write). Do rozważenia/wdrożenia z userem.
-- **Krok publikacji utwardzony** (commit f05da3c): kolejność `commit -> git pull --rebase -> push`
+- **Backend cron — ROZWIĄZANE (zewnętrzny trigger):** wbudowany `schedule` GitHuba w tym repo
+  NIE odpalał się (przez ~10h 0 runów z `schedule`, mimo `state: active` i poprawnej składni —
+  GitHub po cichu gubi zaplanowane runy świeżych repo). Fix: **zewnętrzny budzik cron-job.org**
+  woła co godzinę `POST .../actions/workflows/barometr.yml/dispatches {"ref":"main"}` z fine-grained
+  PAT (scope Actions: read/write, tylko to repo; token żyje TYLKO w cron-job.org). Potwierdzone:
+  runy `workflow_dispatch` przechodzą na zielono i publikują świeży JSON (np. 2026-06-11T06:15Z).
+  `schedule: "17 * * * *"` zostaje w pliku jako backup (gdyby GitHub kiedyś zaczął go odpalać).
+- **Krok publikacji utwardzony** (f05da3c): kolejność `commit -> git pull --rebase -> push`
   odporna na wyścig `! [rejected] (fetch first)`. UWAGA: „Re-run jobs" odtwarza STARY commit →
-  do ręcznego testu używać „Run workflow" na `main`, nie „Re-run".
-  W workflow jest też nieszkodliwy warning deprecacji Node20 (fix: `env: FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"`).
+  do ręcznego testu używać „Run workflow"/triggera, nie „Re-run".
+- **Warning Node20 wyciszony** (7690bab): `env: FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` w workflow.
 
 ## 8. Jak uruchomić (skrót dla usera-amatora)
 
