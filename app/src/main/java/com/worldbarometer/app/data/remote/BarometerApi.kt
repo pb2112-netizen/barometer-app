@@ -1,5 +1,6 @@
 package com.worldbarometer.app.data.remote
 
+import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.data.model.BarometerData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,7 +10,7 @@ import okhttp3.Request
 import java.io.IOException
 
 /**
- * Jedyny endpoint aplikacji: publiczny barometer.json (HTTPS, ~1–2 KB).
+ * Publiczne pliki barometer_{lens}.json (HTTPS, ~1–2 KB każdy).
  * ETag / If-Modified-Since obsługuje OkHttp Cache transparentnie (304 → serwuje
  * treść z cache, zero transferu). Aplikacja nie zna żadnego klucza API.
  */
@@ -23,10 +24,11 @@ class BarometerApi(
         data class Error(val cause: Throwable) : Result
     }
 
-    suspend fun fetch(): Result = withContext(Dispatchers.IO) {
+    suspend fun fetch(lensId: String = LensCatalog.DEFAULT_LENS_ID): Result = withContext(Dispatchers.IO) {
+        val safeLens = LensCatalog.sanitize(lensId)
         try {
             val request = Request.Builder()
-                .url(URL)
+                .url(urlForLens(safeLens))
                 .header("Accept", "application/json")
                 .build()
 
@@ -34,15 +36,12 @@ class BarometerApi(
                 if (!response.isSuccessful) {
                     return@use Result.Error(IOException("HTTP ${response.code}"))
                 }
-                // Twardy limit rozmiaru (plik ma ~2 KB). Chroni przed DoS/„billion laughs"
-                // w razie kompromitacji źródła. peekBody buforuje najwyżej MAX_BODY_BYTES.
                 val body = response.peekBody(MAX_BODY_BYTES).string()
                 if (body.isBlank()) {
                     return@use Result.Error(IOException("Empty body"))
                 }
 
                 val data = json.decodeFromString(BarometerData.serializer(), body)
-                // networkResponse == null → odpowiedź w całości z cache; 304 → niezmienione.
                 val fromCache = response.networkResponse == null || response.networkResponse?.code == 304
                 Result.Success(data, servedFromCache = fromCache)
             }
@@ -52,10 +51,12 @@ class BarometerApi(
     }
 
     companion object {
-        const val URL =
-            "https://raw.githubusercontent.com/pb2112-netizen/barometr/main/barometer.json"
+        const val BASE_URL =
+            "https://raw.githubusercontent.com/pb2112-netizen/barometr/main/"
 
-        /** Sufit rozmiaru odpowiedzi: 256 KB (realny plik ~2 KB). */
+        fun urlForLens(lensId: String): String =
+            "${BASE_URL}barometer_${LensCatalog.sanitize(lensId)}.json"
+
         private const val MAX_BODY_BYTES = 256L * 1024L
     }
 }

@@ -7,15 +7,14 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.worldbarometer.app.core.LensCatalog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val Context.cacheDataStore: DataStore<Preferences> by preferencesDataStore(name = "barometer_cache")
 
 /**
- * Lokalny cache ostatniego znanego wyniku (DataStore). Zasila tryb offline:
- * gdy brak sieci pokazujemy ostatni snapshot + znacznik „nieaktualne".
- * Jedno źródło prawdy dla aplikacji i widgetu.
+ * Lokalny cache wyniku per lens (DataStore). Zasila tryb offline i widget.
  */
 class BarometerStore(context: Context) {
 
@@ -23,20 +22,27 @@ class BarometerStore(context: Context) {
 
     data class CachedSnapshot(val rawJson: String, val fetchedAtMillis: Long)
 
-    val snapshot: Flow<CachedSnapshot?> = dataStore.data.map { prefs ->
-        val raw = prefs[KEY_RAW_JSON] ?: return@map null
-        CachedSnapshot(raw, prefs[KEY_FETCHED_AT] ?: 0L)
+    fun snapshot(lensId: String): Flow<CachedSnapshot?> = dataStore.data.map { prefs ->
+        val safeLens = LensCatalog.sanitize(lensId)
+        val raw = prefs[rawKey(safeLens)]
+            ?: prefs[LEGACY_RAW_JSON].takeIf { safeLens == LensCatalog.DEFAULT_LENS_ID }
+            ?: return@map null
+        CachedSnapshot(raw, prefs[fetchedKey(safeLens)] ?: prefs[LEGACY_FETCHED_AT] ?: 0L)
     }
 
-    suspend fun save(rawJson: String, fetchedAtMillis: Long) {
+    suspend fun save(lensId: String, rawJson: String, fetchedAtMillis: Long) {
+        val safeLens = LensCatalog.sanitize(lensId)
         dataStore.edit { prefs ->
-            prefs[KEY_RAW_JSON] = rawJson
-            prefs[KEY_FETCHED_AT] = fetchedAtMillis
+            prefs[rawKey(safeLens)] = rawJson
+            prefs[fetchedKey(safeLens)] = fetchedAtMillis
         }
     }
 
     private companion object {
-        val KEY_RAW_JSON = stringPreferencesKey("raw_json")
-        val KEY_FETCHED_AT = longPreferencesKey("fetched_at_millis")
+        val LEGACY_RAW_JSON = stringPreferencesKey("raw_json")
+        val LEGACY_FETCHED_AT = longPreferencesKey("fetched_at_millis")
+
+        fun rawKey(lensId: String) = stringPreferencesKey("raw_json_$lensId")
+        fun fetchedKey(lensId: String) = longPreferencesKey("fetched_at_$lensId")
     }
 }

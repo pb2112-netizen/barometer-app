@@ -2,6 +2,7 @@ package com.worldbarometer.app.ui.home
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.worldbarometer.app.core.BrandPalette
+import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.core.Trend
@@ -146,6 +149,15 @@ private fun BarometerContent(state: HomeUiState) {
             )
             Spacer(Modifier.height(8.dp))
         }
+
+        val lensName = data.lensNameEn
+            ?: LensCatalog.nameFor(snapshot.lensId)
+        Text(
+            text = "Lens: $lensName",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
 
         Text(
             text = "Updated: ${RelativeTime.format(data.updatedAt)}",
@@ -289,7 +301,7 @@ private fun EventCard(event: TopEvent) {
             .clickable { expanded = !expanded }
             .animateContentSize(),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         tonalElevation = 1.dp,
     ) {
         Row(modifier = Modifier.padding(14.dp)) {
@@ -343,10 +355,15 @@ private fun EventCard(event: TopEvent) {
 
 @Composable
 private fun DisclaimerBox() {
+    val disclaimerColor = if (isSystemInDarkTheme()) {
+        Color(0xFF1D2328)
+    } else {
+        BrandPalette.warmCream
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(10.dp),
+        color = disclaimerColor,
+        shape = RoundedCornerShape(16.dp),
         tonalElevation = 1.dp,
     ) {
         Text(

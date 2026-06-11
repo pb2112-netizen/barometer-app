@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.glance.appwidget.updateAll
+import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
+import com.worldbarometer.app.widget.BarometerWidget
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -17,12 +20,14 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val notificationsEnabled: Boolean = SettingsStore.DEFAULT_NOTIFICATIONS_ENABLED,
     val threshold: Double = SettingsStore.DEFAULT_THRESHOLD,
+    val lensId: String = LensCatalog.DEFAULT_LENS_ID,
     val lastUpdatedText: String = "—",
+    val isChangingLens: Boolean = false,
 )
 
 class SettingsViewModel(
     private val settingsStore: SettingsStore,
-    repository: BarometerRepository,
+    private val repository: BarometerRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<SettingsUiState> =
@@ -30,7 +35,8 @@ class SettingsViewModel(
             SettingsUiState(
                 notificationsEnabled = settings.notificationsEnabled,
                 threshold = settings.threshold,
-                lastUpdatedText = snapshot?.let { RelativeTime.format(it.data.updatedAt) } ?: "brak danych",
+                lensId = settings.lensId,
+                lastUpdatedText = snapshot?.let { RelativeTime.format(it.data.updatedAt) } ?: "No data yet",
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -40,6 +46,17 @@ class SettingsViewModel(
 
     fun setThreshold(value: Double) {
         viewModelScope.launch { settingsStore.setThreshold(value) }
+    }
+
+    fun setLensId(id: String) {
+        if (!LensCatalog.isValid(id)) return
+        viewModelScope.launch {
+            val current = settingsStore.currentLensId()
+            if (current == id) return@launch
+            settingsStore.setLensId(id)
+            repository.refresh()
+            BarometerWidget().updateAll(ServiceLocator.applicationContext)
+        }
     }
 
     companion object {

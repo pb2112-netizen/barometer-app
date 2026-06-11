@@ -13,7 +13,6 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Lekkie DI bez Hilt (decyzja MVP). Inicjowane raz w BarometerApp.onCreate().
- * Dostępne też dla Workerów (WorkManager) i widgetu (Glance) przez applicationContext.
  */
 object ServiceLocator {
 
@@ -23,11 +22,17 @@ object ServiceLocator {
     @Volatile
     private var settingsStoreRef: SettingsStore? = null
 
+    @Volatile
+    private var appContextRef: Context? = null
+
     val repository: BarometerRepository
         get() = repositoryRef ?: error("ServiceLocator.init() nie zostało wywołane")
 
     val settingsStore: SettingsStore
         get() = settingsStoreRef ?: error("ServiceLocator.init() nie zostało wywołane")
+
+    val applicationContext: Context
+        get() = appContextRef ?: error("ServiceLocator.init() nie zostało wywołane")
 
     fun init(context: Context) {
         if (repositoryRef != null) return
@@ -35,8 +40,8 @@ object ServiceLocator {
             if (repositoryRef != null) return
 
             val appContext = context.applicationContext
+            appContextRef = appContext
 
-            // Cache HTTP (5 MB) → ETag/If-Modified-Since/304 obsługiwane transparentnie.
             val httpCache = Cache(File(appContext.cacheDir, "http_cache"), 5L * 1024 * 1024)
             val client = OkHttpClient.Builder()
                 .cache(httpCache)
@@ -54,12 +59,12 @@ object ServiceLocator {
 
             val api = BarometerApi(client, json)
             val store = BarometerStore(appContext)
-            repositoryRef = BarometerRepository(api, store, json)
-            settingsStoreRef = SettingsStore(appContext)
+            val settings = SettingsStore(appContext)
+            repositoryRef = BarometerRepository(api, store, settings, json)
+            settingsStoreRef = settings
         }
     }
 
-    /** Bezpieczna inicjalizacja z kontekstów spoza Application (Worker/Glance). */
     fun ensureInitialized(context: Context): BarometerRepository {
         if (repositoryRef == null) init(context)
         return repository

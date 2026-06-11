@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.worldbarometer.app.core.LensCatalog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -16,8 +18,6 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 
 /**
  * Ustawienia użytkownika + stan potrzebny do decyzji o powiadomieniu.
- * - notificationsEnabled / threshold: sterowane z ekranu ustawień (Krok 5).
- * - lastNotificationMillis / lastSeenScore: stan wewnętrzny logiki powiadomień (Krok 4).
  */
 class SettingsStore(context: Context) {
 
@@ -26,14 +26,18 @@ class SettingsStore(context: Context) {
     data class Settings(
         val notificationsEnabled: Boolean = DEFAULT_NOTIFICATIONS_ENABLED,
         val threshold: Double = DEFAULT_THRESHOLD,
+        val lensId: String = LensCatalog.DEFAULT_LENS_ID,
     )
 
     val settings: Flow<Settings> = dataStore.data.map { prefs ->
         Settings(
             notificationsEnabled = prefs[KEY_ENABLED] ?: DEFAULT_NOTIFICATIONS_ENABLED,
             threshold = prefs[KEY_THRESHOLD] ?: DEFAULT_THRESHOLD,
+            lensId = LensCatalog.sanitize(prefs[KEY_LENS_ID] ?: LensCatalog.DEFAULT_LENS_ID),
         )
     }
+
+    val lensId: Flow<String> = settings.map { it.lensId }
 
     suspend fun setNotificationsEnabled(enabled: Boolean) {
         dataStore.edit { it[KEY_ENABLED] = enabled }
@@ -43,7 +47,13 @@ class SettingsStore(context: Context) {
         dataStore.edit { it[KEY_THRESHOLD] = value.coerceIn(1.0, 10.0) }
     }
 
+    suspend fun setLensId(value: String) {
+        dataStore.edit { it[KEY_LENS_ID] = LensCatalog.sanitize(value) }
+    }
+
     suspend fun currentSettings(): Settings = settings.first()
+
+    suspend fun currentLensId(): String = currentSettings().lensId
 
     suspend fun lastNotificationMillis(): Long =
         dataStore.data.first()[KEY_LAST_NOTIFICATION] ?: 0L
@@ -62,12 +72,11 @@ class SettingsStore(context: Context) {
     companion object {
         const val DEFAULT_THRESHOLD = 5.0
         const val DEFAULT_NOTIFICATIONS_ENABLED = true
-
-        /** Brak poprzedniego odczytu (pierwsze uruchomienie) — nie wysyłamy powiadomienia. */
         const val NO_PREVIOUS_SCORE = -1.0
 
         private val KEY_ENABLED = booleanPreferencesKey("notifications_enabled")
         private val KEY_THRESHOLD = doublePreferencesKey("notification_threshold")
+        private val KEY_LENS_ID = stringPreferencesKey("lens_id")
         private val KEY_LAST_NOTIFICATION = longPreferencesKey("last_notification_millis")
         private val KEY_LAST_SEEN_SCORE = doublePreferencesKey("last_seen_score")
     }
