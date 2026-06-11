@@ -13,7 +13,7 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 - Changed: `BarometerApi` — dynamiczny URL `barometer_{lens}.json`; `BarometerRepository` reaguje na zmianę lens.
 - Changed: Legal/About — usunięto „planned”, dodano listę krajów i info o pliku per lens.
 - Changed: Home — dyskretna linia „Lens: …” pod summary.
-- Docs: `02_HANDOVER.md` zaktualizowany. Wymaga deploy silnika przed testem u PO.
+- Verified: PO — zmiana lens, widget, offline cache; silnik multi-lens live na GitHub.
 
 ## [proces] — 2026-06-11 — Monorepo lokalne `WB/`
 - Docs: `WorldBarometer`, `barometr`, `Tasks` przeniesione do `WB/`; `WB/README.md`, zaktualizowane

@@ -25,23 +25,23 @@ Backend gotowy i nieruszalny bez prośby. Cała aplikacja po angielsku; komentar
 Protokół dokumentacji: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-handover`).
 
 ## Bieżąca wersja
-- App: **v0.6.0** (versionCode 9, versionName "0.6.0").
-- Backend: multi-lens (5 krajów), batched AI call, manifest.json — **WB-008 wdrożone lokalnie**.
+- App: **v0.6.0** (versionCode 9), tag `v0.6.0`, commit lokalny `e98836e`.
+- Backend: multi-lens live na GitHub (`barometer_{pl,ro,pt,ua,us}.json` + `manifest.json`).
 
 ## Stan na teraz
-- **WB-008 Country lens:** picker w Settings (PL, RO, PT, UA, US), cache per lens, dynamiczny URL, widget + Legal zaktualizowane.
-- MVP + Legal + widget trend + branding — gotowe.
+- **WB-008 Country lens — zweryfikowane u PO:** picker Settings, zmiana lens → inny score/treść, widget OK.
+- MVP + Legal (WB-004) + widget trend (WB-002) + branding (WB-007) + country lens (WB-008) — **gotowe**.
+- Silnik: push na `github.com/pb2112-netizen/barometr`, pliki JSON HTTP 200.
 - Build w Android Studio u usera — kontener bez Android SDK.
-- **Deploy silnika:** przed testem apki u PO — wypchnąć `barometr/` na GitHub (5 plików JSON live).
+- Repo apki: **lokalne git** (`WorldBarometer/.git`), bez remote (PROJECT.md §7).
 
 ## Następne kroki (priorytet malejąco)
-1. PO: push `barometr/` → workflow_dispatch → weryfikacja 5× HTTP 200 na raw.githubusercontent.com.
-2. PO: build v0.6.0 w Android Studio, test zmiany lens → inny score.
+1. **Publikacja Play Store** — listing EN, Data safety, assety w `design/play-store/` (WB-009+).
+2. **Privacy URL** publiczny przed Store (WB-010).
 3. Tłumaczenia PL/EN UI; `@Preview`; testy jednostkowe core.
-4. Publikacja Play (WB-009 privacy URL, Data safety).
+4. Opcjonalnie: remote git dla `WorldBarometer/` (backup na GitHub).
 
 ## Otwarte problemy
 - **Build tylko u usera:** brak Android SDK w kontenerze.
 - **`gradle-wrapper.jar` nie commitowany** — AS dogeneruje lub `gradle wrapper`.
 - **PAT cron-job.org wygasa** — przy 401 odnowić token (repo `barometr`).
-- **JSON multi-lens na GitHub:** lokalnie wygenerowane — wymaga push + workflow przed testem apki u PO.
