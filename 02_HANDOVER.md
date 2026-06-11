@@ -1,122 +1,37 @@
-> ============================================================
-> ## ETAP 2 z 2 — APLIKACJA ANDROID: ZBUDOWANA (MVP + poprawki v0.2.0) ✅
-> 👉 **TO JEST NAJNOWSZY STAN — ZACZNIJ TUTAJ.**
-> NIE zaczynaj od zera: MVP (5 kroków), hardening, polityka prywatności, disclaimer i bugfixy
-> są ZROBIONE. Dalszy rozwój → patrz sekcja 9 „Sensowne następne kroki".
-> Etap 1 (backend + kontrakt danych, tylko do wglądu): **`../barometr/01_START_TUTAJ.md`**.
-> ============================================================
+# HANDOVER — World Barometer (Android) — ŻYWY STAN
 
-# HANDOVER — World Barometer (Android) — ETAP 2
+> 👉 **ZACZNIJ TUTAJ.** To jest bieżący stan projektu (mały, aktualny). Nie gromadzi historii.
+> Limit ~120 linii — gdy rośnie, przenieś rozwiązane/stare do `CHANGELOG.md`.
 
-Dokument przekazania dla nowej sesji/modelu. Czytaj na starcie, zanim zaczniesz kodować.
-Cel projektu: natywna apka Android, która TYLKO pobiera gotowy publiczny JSON i prezentuje
-„barometr" sytuacji światowej. Backend jest gotowy i nieruszalny.
+Cel: natywna apka Android, która TYLKO pobiera publiczny JSON i prezentuje „barometr" świata.
+Backend gotowy i nieruszalny bez prośby. Cała aplikacja po angielsku; komentarze w kodzie mogą być PL.
 
----
+## Read order (start sesji)
+1. **Ten plik** (cały) — stan + następne kroki + otwarte problemy.
+2. **`PROJECT.md`** — stabilna referencja (architektura, stos, decyzje, logika, kontrakt, wersjonowanie).
+3. **`CHANGELOG.md`** — TYLKO gdy potrzebujesz historii/„dlaczego".
+4. **`barometr/01_START_TUTAJ.md`** (+ `SPEC_MVP.md`, `makiety/paleta.json`) — TYLKO gdy zadanie dotyka backendu/danych.
+5. Protokół utrzymania tych dokumentów: `.cursor/rules/handover.mdc`.
 
-## 1. Gdzie co jest
+## Bieżąca wersja
+- App: **v0.3.0** (versionCode 4, versionName "0.3.0"), tag `v0.3.0` = bieżący `main`.
+- Backend: silnik liczy ~co godzinę; uruchamiany zewnętrznym triggerem (cron-job.org), działa.
 
-- **Aplikacja Android (ten projekt):** `/workspaces/Agenci_SEO/WorldBarometer/` — osobne repo git.
-- **Backend (silnik, NIE ruszać bez prośby):** `/workspaces/Agenci_SEO/barometr/` — Python + GitHub Actions.
-- **Kontrakt danych i decyzje (ETAP 1):** `barometr/01_START_TUTAJ.md`, `barometr/SPEC_MVP.md`, `barometr/makiety/paleta.json`. **Przeczytaj je.**
-- **Endpoint danych (jedyny):** `https://raw.githubusercontent.com/pb2112-netizen/barometr/main/barometer.json`
-- Aplikacja NIE zna żadnego klucza API. Czyta tylko publiczny plik.
+## Stan na teraz
+- MVP (5 kroków) + hardening + privacy + disclaimer + atrybucja źródeł — **gotowe**.
+- Odświeżanie dopasowane do backendu: WorkManager 60 min (`UPDATE`), próg stale 90 min.
+- Backend stabilny: cron `17 * * * *` (+ zewnętrzny trigger jako realny napęd), push utwardzony.
+- Aplikacja **nieskompilowana w kontenerze** (brak Android SDK) — build robi user w Android Studio.
 
-## 2. Stos i decyzje techniczne (trzymaj się ich)
+## Następne kroki (priorytet malejąco; do uzgodnienia)
+1. Tłumaczenia PL/EN przez `res/values/strings.xml` (teraz teksty EN wpisane w kodzie — do ekstrakcji).
+2. `@Preview` dla ekranów (podgląd UI bez emulatora).
+3. Testy jednostkowe: `Level.resolve`, `ContentSafety.sanitized`, logika powiadomień, `RelativeTime`.
+4. Ikona launchera (obecnie prosty wektor) + grafiki do Google Play.
+5. Publikacja: Play Console, podpis (Play App Signing), polityka prywatności jako URL, Data safety, ocena treści.
+6. Ew. „tap widgetu = odświeżenie" jako osobna akcja (kod był w `RefreshWidgetAction`, usunięty w v0.2.0).
 
-- Kotlin + Jetpack Compose (Material3), single-Activity, **minSdk 26 / compile+target 35**.
-- Sieć: **OkHttp + kotlinx.serialization** (świadomie BEZ Retrofit). Cache HTTP (ETag/304) w OkHttp.
-- **DataStore Preferences** (2 magazyny): cache wyniku + ustawienia.
-- **WorkManager** (cykl 15 min, constraints sieć+bateria).
-- **Glance** (widget). **DI: prosty `ServiceLocator`** (bez Hilt).
-- Build: Gradle KTS + version catalog `gradle/libs.versions.toml` (AGP 8.5.2, Kotlin 2.0.20, Compose BOM 2024.09.02).
-- Pakiet: `com.worldbarometer.app`.
-
-## 3. Architektura (mapa plików)
-
-```
-core/         Level (mapowanie label/score), LevelPalette+NeutralPalette (z paleta.json),
-              RelativeTime (czas wzgl., EN), ContentSafety (sanityzacja niezaufanego JSON)
-data/model/   BarometerData, TopEvent (@Serializable, 1:1 z barometer.json)
-data/remote/  BarometerApi (OkHttp, limit 256 KB)
-data/local/   BarometerStore (cache wyniku), SettingsStore (próg, on/off, stan powiadomień)
-data/repo/    BarometerRepository (refresh()+observe(), Snapshot{level,trend,isStale 45min})
-di/           ServiceLocator (repository, settingsStore; init w BarometerApp)
-ui/home/      MainScreen (dashboard), HomeViewModel
-ui/settings/  SettingsScreen, SettingsViewModel
-ui/theme/     BarometerTheme (light/dark)
-widget/       BarometerWidget (Glance), BarometerWidgetReceiver
-work/         RefreshWorker (pobiera w tle, update widget, logika powiadomień),
-              RefreshScheduler (periodic+one-off), Notifier (kanał+alert)
-```
-
-## 4. Logika kluczowa (żeby nie odkrywać od nowa)
-
-- **Poziomy/kolory:** `Level.resolve(level_label, score)` — priorytet etykiety z JSON, fallback ze score.
-  Zakresy: Stable<3, Low<5, Elevated<7, High<9, Critical≥9. Kolory/gradienty = `paleta.json`.
-- **Powiadomienie (RefreshWorker):** wyślij gdy `score ≥ próg` ORAZ wzrost względem poprzedniego
-  odczytu ORAZ minęło ≥ 3 h od ostatniego (pierwszy odczyt nigdy nie alarmuje). Próg z SettingsStore (domyślnie 5.0).
-- **Pull-to-refresh:** throttling 60 s (HomeViewModel.MANUAL_THROTTLE_MS); przy throttlingu pokazujemy krótki feedback bez sieci.
-- **Stale:** dane > 45 min = baner „Data may be out of date". Offline = ostatni cache + baner.
-- **Sanityzacja:** `BarometerData.sanitized()` (clamp 1–10, max 3 eventy, czyszczenie znaków sterujących,
-  limity długości) stosowana w repo przy sieci i cache. UI renderuje tylko Text (zero WebView/HTML).
-- **Bezpieczeństwo:** `network_security_config.xml` wymusza TLS (bez cleartext), bez cert-pinningu (świadomie).
-
-## 5. Wersjonowanie (git, lokalne, bez remote)
-
-- Repo git w `WorldBarometer/`. Brak globalnej tożsamości git → commituj z inline:
-  `git -c user.name="World Barometer Dev" -c user.email="dev@worldbarometer.local" commit ...`
-  (NIE modyfikuj globalnego git config).
-- Tagi: **`v0.1.0`** = baseline MVP, **`v0.2.0`**/`v0.2.1` = poprawki bugów,
-  **`v0.3.0`** = dopasowanie częstotliwości odświeżania do backendu (bieżący `main`).
-- Wersja w `app/build.gradle.kts`: versionCode 4, versionName "0.3.0". Przy kolejnych zmianach podbijaj.
-- Powrót do punktu: `git checkout v0.1.0` / `git checkout main`.
-
-## 6. Stan na teraz (po v0.3.0)
-
-Najnowsze (v0.3.0): **dopasowanie częstotliwości odświeżania do backendu** (silnik liczy ~co godzinę).
-- `RefreshScheduler`: interwał WorkManager 15 → **60 min**; polityka `KEEP` → **`UPDATE`**
-  (przy aktualizacji appki nowy interwał podmienia stary plan, nie gubiąc harmonogramu).
-- `BarometerRepository.STALE_AFTER_MILLIS`: 45 → **90 min** (próg „Data may be out of date"
-  dopasowany do cyklu godzinnego — żeby baner nie świecił fałszywie między aktualizacjami).
-- Backend (osobne repo `barometr/`): cron `*/30` → **`17 * * * *`**, wypchnięty na `main`.
-
-Zrobione wcześniej: cały MVP (5 kroków) + hardening + polityka prywatności (Settings) + disclaimer (dashboard)
-+ atrybucja źródeł (po rozwinięciu eventu). Poprawione bugi z testów:
-- Sekcja „Top events" zwijalna (domyślnie zwinięta) + karty zwijalne (domyślnie zwinięte).
-- Manualne odświeżanie (pull-to-refresh + przycisk Refresh w app barze).
-- Cała aplikacja po angielsku (UI, disclaimer, privacy, ustawienia, czas, powiadomienia).
-- Pasek skali z oznaczeniami 1 (min) i 10 (max).
-- Widget: last update + ocena „X/10" (10 jak potęga) + krótki komentarz + tap otwiera aplikację.
-
-## 7. WAŻNE / nieрozwiązane
-
-- **NIE skompilowano w tym środowisku** (brak Android SDK + brak dostępu do pobierania zależności w kontenerze).
-  Pierwszy realny build/sync robi użytkownik w Android Studio. Możliwe drobne korekty wersji bibliotek.
-- **gradle-wrapper.jar nie jest commitowany** (binarny) — Android Studio dogeneruje przy otwarciu, lub `gradle wrapper`.
-- **Backend cron — ROZWIĄZANE (zewnętrzny trigger):** wbudowany `schedule` GitHuba w tym repo
-  NIE odpalał się (przez ~10h 0 runów z `schedule`, mimo `state: active` i poprawnej składni —
-  GitHub po cichu gubi zaplanowane runy świeżych repo). Fix: **zewnętrzny budzik cron-job.org**
-  woła co godzinę `POST .../actions/workflows/barometr.yml/dispatches {"ref":"main"}` z fine-grained
-  PAT (scope Actions: read/write, tylko to repo; token żyje TYLKO w cron-job.org). Potwierdzone:
-  runy `workflow_dispatch` przechodzą na zielono i publikują świeży JSON (np. 2026-06-11T06:15Z).
-  `schedule: "17 * * * *"` zostaje w pliku jako backup (gdyby GitHub kiedyś zaczął go odpalać).
-- **Krok publikacji utwardzony** (f05da3c): kolejność `commit -> git pull --rebase -> push`
-  odporna na wyścig `! [rejected] (fetch first)`. UWAGA: „Re-run jobs" odtwarza STARY commit →
-  do ręcznego testu używać „Run workflow"/triggera, nie „Re-run".
-- **Warning Node20 wyciszony** (7690bab): `env: FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` w workflow.
-
-## 8. Jak uruchomić (skrót dla usera-amatora)
-
-Android Studio → Open → folder `WorldBarometer` → poczekaj na Gradle sync (pierwszy raz długo) →
-Device Manager (emulator Pixel, API 34/35) lub telefon z debugowaniem USB → ▶ Run.
-
-## 9. Sensowne następne kroki (poza MVP, do uzgodnienia)
-
-- Tłumaczenia PL/EN przez `res/values/strings.xml` (teraz teksty są wpisane w kodzie po EN — do ekstrakcji).
-- `@Preview` dla ekranów (podgląd UI bez emulatora).
-- Testy jednostkowe: `Level.resolve`, `ContentSafety.sanitized`, logika powiadomień, `RelativeTime`.
-- Ikona launchera (obecnie prosty wektor) + grafiki do Google Play.
-- Publikacja: konto Play Console, podpis (Play App Signing), polityka prywatności jako URL (hosting),
-  Data safety, ocena treści. (Patrz wcześniejsze ustalenia w rozmowie.)
-- Ew. ponowne włączenie „tap widgetu = odświeżenie" jako osobna akcja, jeśli będzie potrzeba (kod był w RefreshWidgetAction, usunięty w v0.2.0).
+## Otwarte problemy (tylko NIEROZWIĄZANE)
+- **Build tylko u usera:** kontener nie ma Android SDK ani dostępu do zależności — możliwe drobne korekty wersji bibliotek przy pierwszym sync.
+- **`gradle-wrapper.jar` nie jest commitowany** (binarny) — Android Studio dogeneruje przy otwarciu, lub `gradle wrapper`.
+- **PAT do triggera backendu wygasa** (cron-job.org) — przy 401 w logach odnowić token (scope Actions: read/write, tylko repo `barometr`).
