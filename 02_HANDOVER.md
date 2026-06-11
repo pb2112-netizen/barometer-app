@@ -13,8 +13,8 @@ Backend gotowy i nieruszalny bez prośby. Cała aplikacja po angielsku; komentar
 4. **`barometr/01_START_TUTAJ.md`** (+ `SPEC_MVP.md`, `makiety/paleta.json`) — TYLKO gdy zadanie dotyka backendu/danych.
 
 Protokół utrzymania tych dokumentów to reguła workspace `.cursor/rules/barometr-handover.mdc`
-(agent-requested) — **wyzwalana hasłem „aplikacja barometr"** na starcie rozmowy. Bez hasła sesja
-jest domyślnie czysta (protokół się nie ładuje).
+(MANUALNA) — **przywoływana wzmianką `@barometr-handover`** na starcie rozmowy. Bez przywołania
+sesja jest domyślnie czysta (zero śladu, protokół się nie ładuje).
 
 ## Bieżąca wersja
 - App: **v0.3.0** (versionCode 4, versionName "0.3.0"), tag `v0.3.0` = bieżący `main`.
