@@ -2,6 +2,7 @@ package com.worldbarometer.app.ui.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.worldbarometer.app.R
+import com.worldbarometer.app.core.BrandPalette
 
 @Composable
 fun CountryLensChip(
@@ -62,7 +64,12 @@ fun CountryLensChip(
                     text = countryName,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
+                    // Light: primary (calmTeal 0xFF8FB8B2) ginie na jasnym chipie → ciemny wariant brandu.
+                    color = if (isSystemInDarkTheme()) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        BrandPalette.calmTealDeep
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
