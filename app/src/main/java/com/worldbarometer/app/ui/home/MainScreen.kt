@@ -46,15 +46,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.worldbarometer.app.R
 import com.worldbarometer.app.core.BrandPalette
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
+import com.worldbarometer.app.core.Tone
 import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.data.model.TopEvent
 import com.worldbarometer.app.data.repo.BarometerRepository
@@ -107,7 +112,9 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
     val snapshot = state.snapshot ?: return
     val data = snapshot.data
     val level = snapshot.level
-    val levelColor = LevelPalette.color(level)
+    val tone = snapshot.tone
+    val levelColor = LevelPalette.color(level, tone)
+    val levelLabel = stringResource(LevelPalette.labelRes(level, tone))
     val countryName = data.lensNameEn ?: LensCatalog.nameFor(snapshot.lensId)
 
     Column(
@@ -131,18 +138,24 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         CountryLensChip(countryName = countryName, onClick = onOpenSettings)
         Spacer(Modifier.height(12.dp))
 
+        val scoreText = String.format(Locale.US, "%.1f", data.globalScore)
+        // a11y (WB-014 §4.6): ton niesiony tekstem opisu — TalkBack nie polega na kolorze.
+        val scoreDescription = stringResource(
+            LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel,
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = String.format(Locale.US, "%.1f", data.globalScore),
+                text = scoreText,
                 color = levelColor,
                 fontSize = 92.sp,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { contentDescription = scoreDescription },
             )
             Spacer(Modifier.size(8.dp))
-            TrendArrow(snapshot.trend)
+            TrendArrow(snapshot.trend, tone)
         }
 
-        LevelPill(label = level.label, color = levelColor)
+        LevelPill(label = levelLabel, color = levelColor)
         Spacer(Modifier.height(16.dp))
 
         ScoreBar(score = data.globalScore, color = levelColor)
@@ -218,16 +231,31 @@ private fun EventsSection(events: List<TopEvent>) {
 }
 
 @Composable
-private fun TrendArrow(trend: Trend) {
+private fun TrendArrow(trend: Trend, tone: Tone) {
+    // Kształty strzałek bez zmian (WB-014 §4.4) — zmienia się tylko kolor i opis.
     val icon: ImageVector = when (trend) {
         Trend.RISING -> Icons.Filled.TrendingUp
         Trend.FALLING -> Icons.Filled.TrendingDown
         Trend.STABLE -> Icons.Filled.TrendingFlat
     }
+    val description = if (trend == Trend.RISING) {
+        stringResource(
+            R.string.trend_description_rising,
+            stringResource(
+                when (tone) {
+                    Tone.NEGATIVE -> R.string.tone_word_negative
+                    Tone.POSITIVE -> R.string.tone_word_positive
+                    Tone.NEUTRAL -> R.string.tone_word_neutral
+                },
+            ),
+        )
+    } else {
+        stringResource(R.string.trend_description, trend.name.lowercase())
+    }
     Icon(
         imageVector = icon,
-        contentDescription = "Trend: ${trend.name.lowercase()}",
-        tint = LevelPalette.trendColor(trend),
+        contentDescription = description,
+        tint = LevelPalette.trendColor(trend, tone, isSystemInDarkTheme()),
         modifier = Modifier.size(40.dp),
     )
 }
@@ -303,7 +331,7 @@ private fun EventCard(event: TopEvent) {
         tonalElevation = 1.dp,
     ) {
         Row(modifier = Modifier.padding(14.dp)) {
-            ScoreBadge(event.score)
+            ScoreBadge(score = event.score, sentiment = Tone.fromString(event.sentiment))
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -376,11 +404,12 @@ private fun DisclaimerBox() {
 }
 
 @Composable
-private fun ScoreBadge(score: Double) {
+private fun ScoreBadge(score: Double, sentiment: Tone) {
+    // Kolor z pary (score eventu x sentiment eventu) — nie z globalnego tone (AC-5).
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(LevelPalette.eventBadgeColor(score))
+            .background(LevelPalette.eventBadgeColor(score, sentiment))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {

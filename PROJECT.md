@@ -36,13 +36,15 @@ Bieżący stan i następne kroki → `02_HANDOVER.md`. Historia → `CHANGELOG.m
 ## 4. Architektura (mapa plików)
 
 ```
-core/         Level (mapowanie label/score), LevelPalette+NeutralPalette (z paleta.json),
+core/         Level (pasmo ze score), Tone (sentyment, default NEUTRAL — WB-014),
+              LevelPalette (JEDNO źródło prawdy: pasmo×ton → etykieta/kolor/opis a11y,
+              współdzielone dashboard+widget+powiadomienie) + NeutralPalette,
               BrandPalette (akcenty spokoju — nie poziomy alertu), RelativeTime, ContentSafety,
               LegalLinks, OpenExternal (stałe URL/mail, Intent bez WebView)
 data/model/   BarometerData, TopEvent (@Serializable, 1:1 z barometer.json)
 data/remote/  BarometerApi (OkHttp, limit 256 KB)
 data/local/   BarometerStore (cache wyniku), SettingsStore (próg, on/off, stan powiadomień)
-data/repo/    BarometerRepository (refresh()+observe(), Snapshot{level,trend,isStale})
+data/repo/    BarometerRepository (refresh()+observe(), Snapshot{level,tone,trend,isStale})
 di/           ServiceLocator (repository, settingsStore; init w BarometerApp)
 ui/home/      MainScreen (dashboard), HomeViewModel
 ui/settings/  SettingsScreen, SettingsViewModel
@@ -55,8 +57,15 @@ work/         RefreshWorker (pobiera w tle, update widget, logika powiadomień),
 
 ## 5. Logika kluczowa (żeby nie odkrywać od nowa)
 
-- **Poziomy/kolory:** `Level.resolve(level_label, score)` — priorytet etykiety z JSON, fallback ze score.
-  Zakresy: Stable<3, Low<5, Elevated<7, High<9, Critical≥9. Kolory/gradienty = `paleta.json`.
+- **Poziomy/kolory (dwuosiowe od v0.7.0, WB-014/015):** pasmo = `Level.fromScore(score)`
+  (progi: <3, <5, <7, <9, ≥9 — bez zmian); ton = `Tone.fromString(tone)` (default NEUTRAL —
+  stary cache działa). `level_label` z JSON = **legacy, ignorowany** w prezentacji.
+  Etykieta/kolor/opis z `LevelPalette` (pasmo×ton): pas spokoju <5 brand teal/sage bez
+  tonowania; ≥5: negative = stara rampa amber→czerwień, positive = emerald, neutral = amber.
+  Słownik etykiet: Calm/Quiet | Elevated/Active/Promising | High/Significant/Positive |
+  Severe/Major/Breakthrough (strings.xml). Badge eventu per (score×sentiment eventu).
+  Trend: falling zawsze teal, rising per ton, stable szary. BEZ ikon tonu (decyzja PO);
+  ton w a11y niesie tekst (contentDescription). Widget: 11 gradientów (2 spokoju + 3×3 sygnał).
 - **Odświeżanie:** WorkManager periodic **60 min** (`RefreshScheduler`, polityka `UPDATE`),
   constraints sieć+bateria. Plus one-off (pull-to-refresh / przyszłe tapy). Wyzwalacze ręczne
   (przycisk Refresh, pull-to-refresh) → `HomeViewModel.refresh(manual=true)`; otwarcie ekranu też odświeża.
@@ -72,9 +81,11 @@ work/         RefreshWorker (pobiera w tle, update widget, logika powiadomień),
 
 ## 6. Kontrakt danych (skrót; pełny w `barometr/01_START_TUTAJ.md`)
 
-Pola `barometer.json` używane przez UI: `global_score` (1.0–10.0, wielka liczba + kolor),
-`level_label` (Stable/Low/Elevated/High/Critical), `trend` (rising/falling/stable), `short_summary`,
-`top_events[]` (`title`, `summary`, `score`, `sources`), `updated_at` (ISO UTC). Język treści: angielski.
+Pola `barometer.json` używane przez UI: `global_score` (1.0–10.0 = **istotność** zmiany,
+w dowolną stronę — WB-013), `tone` (negative/positive/neutral, globalny ton lensu),
+`trend` (rising/falling/stable), `short_summary`, `top_events[]` (`title`, `summary`, `score`,
+`sentiment`, `sources`), `updated_at` (ISO UTC). Pole `level_label` = legacy (silnik utrzymuje
+dla apek ≤ v0.6.x; nowa apka ignoruje). Język treści: angielski.
 
 ## 7. Wersjonowanie (git)
 

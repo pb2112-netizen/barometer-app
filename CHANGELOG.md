@@ -7,6 +7,37 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 
 ---
 
+## [v0.7.0] — 2026-06-12 — WB-014 + WB-015: dwuosiowy system kolorów (istotność × ton)
+Wydanie wspólne z silnikiem WB-013 (JSON: `tone` per lens + `sentiment` per event).
+Dlaczego: wysoki score przestaje być automatycznie „czerwony" — pozytywny przełom (koniec wojny,
+przełom medyczny) jest zielony, ważna zmiana bez werdyktu bursztynowa; pas spokoju = brand teal.
+
+WB-014 (dashboard):
+- Added: `core/Tone.kt` — enum NEGATIVE/POSITIVE/NEUTRAL, `fromString` z twardym defaultem
+  NEUTRAL (stary cache bez pól WB-013 działa bez crasha).
+- Added: `BarometerData.tone` + `TopEvent.sentiment` (nullable, default null) + sanityzacja.
+- Changed: `LevelPalette` przebudowane na JEDNO źródło prawdy (pasmo × ton) → `labelRes`
+  (słownik: Calm/Quiet | Elevated/Active/Promising | High/Significant/Positive |
+  Severe/Major/Breakthrough), `color` (negative = stara rampa, positive = emerald,
+  neutral = amber, pas spokoju <5 = brand teal/sage bez tonowania), `scoreDescriptionRes`,
+  `trendColor(trend, tone, dark)` (falling zawsze teal, rising per ton), `eventBadgeColor(score, sentiment)`.
+- Changed: `Level` — pasmo liczone WYŁĄCZNIE ze score; usunięte `label`/`fromLabel`/`resolve`
+  (pole `level_label` z JSON = legacy, ignorowane w prezentacji); `Snapshot.tone`.
+- Changed: `MainScreen` — cyfra/pill/badge eventów wg macierzy; badge per (score × sentiment
+  eventu); TrendArrow z tonem; zero nowych ikon (decyzja PO).
+- Changed: powiadomienie (`RefreshWorker`→`Notifier`) używa etykiety ze wspólnego słownika.
+- Added: a11y — `contentDescription` score'u i trendu z tonem (`strings.xml`, szablony EN).
+
+WB-015 (widget):
+- Added: 11 gradientów tła `widget_bg_{calm,quiet}` + `{mid,high,top}_{negative,neutral,positive}`
+  (pas spokoju wspólny dla tonów; negative = dotychczasowe gradienty sygnałowe).
+- Removed: stare `widget_bg_{stable,low,elevated,high,critical}` (bez martwych zasobów).
+- Changed: `backgroundFor(level, tone)`; brak danych → Calm + NEUTRAL; etykieta pod score ze
+  wspólnego słownika WB-014; contentDescription z frazą tonu przy score ≥ 5; strzałka trendu
+  bez zmian (biała, WB-002).
+- Pending: testy wizualne T1–T6 (kontrast 11 teł, „Breakthrough" na minHeight 110dp, stary
+  cache, kraj, tap/refresh) — wymagają builda u PO.
+
 ## [v0.6.4] — 2026-06-12 — Widget: render bezpośredni przez AppWidgetManager (omija sesje Glance)
 - Fixed (próba 3, po niepowodzeniu v0.6.3 u PO): widget nadal nie reagował na zmianę kraju
   mimo poprawnego (książkowego) wzorca reaktywnego. Wniosek: zawodzi DOSTARCZENIE renderu —

@@ -5,4 +5,35 @@
     <string name="settings_country_lens_description">Scores reflect how world events may affect daily life in the selected country. This is not your physical location — the app does not use GPS.</string>
     <string name="scoring_for_prefix">Scoring for:</string>
     <string name="scoring_for_content_description">Scoring for %1$s. Tap to change country.</string>
+
+    <!-- WB-014: słownik etykiet poziomu (pasmo score x ton) — źródło prawdy: spec §4.2 -->
+    <string name="level_calm">Calm</string>
+    <string name="level_quiet">Quiet</string>
+    <string name="level_elevated">Elevated</string>
+    <string name="level_active">Active</string>
+    <string name="level_promising">Promising</string>
+    <string name="level_high">High</string>
+    <string name="level_significant">Significant</string>
+    <string name="level_positive">Positive</string>
+    <string name="level_severe">Severe</string>
+    <string name="level_major">Major</string>
+    <string name="level_breakthrough">Breakthrough</string>
+
+    <!-- WB-014 §4.6: a11y — ton niesiony tekstem (bez ikon). %1$s = score, %2$s = etykieta -->
+    <string name="score_description_calm">Score %1$s of 10, %2$s</string>
+    <string name="score_description_negative">Score %1$s of 10, %2$s — negative development</string>
+    <string name="score_description_positive">Score %1$s of 10, %2$s — positive development</string>
+    <string name="score_description_neutral">Score %1$s of 10, %2$s — important, mixed signals</string>
+
+    <!-- a11y trendu: ton tylko przy rising -->
+    <string name="trend_description">Trend: %1$s</string>
+    <string name="trend_description_rising">Trend: rising, %1$s</string>
+    <string name="tone_word_negative">negative</string>
+    <string name="tone_word_positive">positive</string>
+    <string name="tone_word_neutral">neutral</string>
+
+    <!-- frazy tonu (widget contentDescription, spójne ze score_description_*) -->
+    <string name="tone_phrase_negative">negative development</string>
+    <string name="tone_phrase_positive">positive development</string>
+    <string name="tone_phrase_neutral">important, mixed signals</string>
 </resources>
