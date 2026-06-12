@@ -23,6 +23,9 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
   filtr w logcat pokazuje całą ścieżkę zmiany kraju.
 - Note: limit Androida (~30 min) dotyczy tylko pasywnego `updatePeriodMillis`; event-driven
   update'y (akcja usera, worker) są dozwolone i natychmiastowe — oczekiwane UX jest osiągalne.
+- Verified: **✅ PO (2026-06-12, S24 + emulator Pixel 7)** — widget reaguje na zmianę kraju;
+  problem odświeżania ZAMKNIĘTY po 3 podejściach (v0.6.2 hipoteza One UI — błędna;
+  v0.6.3 treść reaktywna — poprawna, ale niewystarczająca; v0.6.4 bezpośredni render — skuteczny).
 
 ## [v0.6.3] — 2026-06-12 — Widget: reaktywna treść (fix martwego odświeżania)
 - Fixed: **widget nie odświeżał się po zmianie kraju** (czasem dopiero po ~10 s, czasem wcale,

@@ -31,13 +31,10 @@ Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-han
 - **Backend live:** multi-lens — `barometer_{pl,ro,pt,ua,us}.json` + `manifest.json`. **JSON dostanie WB-012 przy najbliższym cyklu silnika** (cron co godzinę, `~:01`).
 
 ## Stan na teraz
-- **Done (sesja 2026-06-12, v0.6.4 — 3. podejście do widgetu):** v0.6.3 (treść reaktywna —
-  wzorzec poprawny wg docs, zostaje) NIE wystarczyła — u PO objaw bez zmian. Diagnoza: gubi się
-  DOSTARCZANIE renderu przez mechanizm sesji Glance (`update()` przy żywej/zombie sesji = event
-  do SessionWorkera, znany problem ignorowanych update'ów). v0.6.4: `BarometerWidgetUpdater`
-  renderuje przez `runComposition()` i wypycha RemoteViews WPROST przez
-  `AppWidgetManager.updateAppWidget()` (bez sesji); fallback `update()`; logi tag `WB-Widget`.
-  Szczegóły → `CHANGELOG.md` [v0.6.4]. **Czeka na build+test u PO.**
+- **Done (sesja 2026-06-12, v0.6.4):** **widget odświeża się poprawnie — ✅ zweryfikowane u PO.**
+  Rozwiązanie: render przez `runComposition()` + RemoteViews wprost do `AppWidgetManager`
+  (z pominięciem zawodnego mechanizmu sesji Glance); treść reaktywna z v0.6.3 zostaje.
+  Pełna historia diagnozy (3 podejścia) → `CHANGELOG.md` [v0.6.2]–[v0.6.4].
 - **Done (sesja 2026-06-12, v0.6.2):** widget — czas absolutny („Updated"/Settings); fix pustego
   widgetu dla krajów ≠ PL — ✅ u PO; hybryda foreground + expedited backstop; kontrast chipa kraju (light) — ✅ u PO.
 - **Done (sesja 2026-06-12):** WB-012 — `_ensure_event_summaries()`, prompt AI, tryb prosty; apka bez zmian kodu (`EventCard` już renderuje `summary`).
@@ -45,15 +42,11 @@ Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-han
 - **Build:** tylko u PO w Android Studio — kontener bez Android SDK.
 
 ## Następne kroki (priorytet ↓)
-1. **Build u PO (v0.6.4) → test widgetu:** zmiana kraju → widget (kraj + „Updated") w ~1–2 s.
-   Jeśli NADAL źle: logcat filtr `WB-Widget` (pokaże, które ogniwo pada: setLensId → doWork →
-   requestUpdate direct/fallback). Po OK: `git tag v0.6.4 && git push origin --tags`.
+1. **Tag u PO:** `git tag v0.6.4 && git push origin --tags` (build i test już OK).
 2. **Weryfikacja u PO — WB-012:** pull-to-refresh w apce → rozwinięta karta Top event: akapit opisu **nad** „Sources"; sprawdź niepuste `top_events[].summary` w 5 plikach JSON (silnik wypushowany, cykl ~:01).
 3. **Play Store (WB-009+)** + **Privacy URL (WB-010)** przed publikacją.
 
 ## Otwarte problemy
-- **v0.6.4 (widget, 3. podejście) nie zweryfikowane u PO** — wymaga builda; przy porażce
-  zebrać logcat `WB-Widget` PRZED kolejnymi zmianami kodu.
 - **WB-012 nie zweryfikowane u PO** — czeka cykl silnika + refresh apki.
 - **Build tylko u usera** — brak Android SDK w kontenerze.
 - **`gradle-wrapper.jar` nie w repo** — Android Studio dogeneruje przy sync.
