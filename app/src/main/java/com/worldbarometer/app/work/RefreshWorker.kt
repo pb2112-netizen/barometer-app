@@ -1,6 +1,7 @@
 package com.worldbarometer.app.work
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
@@ -22,8 +23,10 @@ class RefreshWorker(
         val repository = ServiceLocator.ensureInitialized(applicationContext)
         val settings = ServiceLocator.settingsStore
         val lensChange = inputData.getBoolean(KEY_LENS_CHANGE, false)
+        Log.d(TAG, "doWork: start (lensChange=$lensChange)")
 
         val result = repository.refresh()
+        Log.d(TAG, "doWork: refresh -> ${result::class.simpleName}")
 
         // update() PO pobraniu (cache jest już zapisany) — restartuje martwą sesję Glance,
         // która od razu czyta świeży cache. Żywa sesja i tak przerysowała się sama po zapisie
@@ -88,6 +91,8 @@ class RefreshWorker(
     }
 
     companion object {
+        private const val TAG = "WB-Widget"
+
         /** Limit częstotliwości powiadomień: 3 h. */
         const val NOTIFICATION_COOLDOWN_MS = 3L * 60L * 60L * 1000L
 

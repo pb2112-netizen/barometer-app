@@ -7,6 +7,23 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 
 ---
 
+## [v0.6.4] — 2026-06-12 — Widget: render bezpośredni przez AppWidgetManager (omija sesje Glance)
+- Fixed (próba 3, po niepowodzeniu v0.6.3 u PO): widget nadal nie reagował na zmianę kraju
+  mimo poprawnego (książkowego) wzorca reaktywnego. Wniosek: zawodzi DOSTARCZENIE renderu —
+  `GlanceAppWidget.update()` przy żywej/zombie sesji tylko zgłasza event do SessionWorkera,
+  a te bywają gubione (znany problem biblioteki: update'y w oknie życia sesji ~45 s ignorowane).
+- Changed: `BarometerWidgetUpdater` — **omija menedżera sesji Glance**: `runComposition()`
+  (Glance 1.1, @ExperimentalGlanceApi; obecność API zweryfikowana w binarce 1.1.0) renderuje
+  pełny `provideGlance` do RemoteViews, wypychanych BEZPOŚREDNIO przez
+  `AppWidgetManager.updateAppWidget()` — deterministyczna ścieżka klasycznych widgetów.
+  Timeout 10 s → fallback na klasyczne `update()`. Mutex (runComposition nie wspiera
+  równoległych wywołań dla tego samego ID). Jedyna akcja widgetu (`actionStartActivity`)
+  to PendingIntent — działa bez sesji.
+- Added: logi diagnostyczne tag **`WB-Widget`** (updater, `RefreshWorker`, `setLensId`) —
+  filtr w logcat pokazuje całą ścieżkę zmiany kraju.
+- Note: limit Androida (~30 min) dotyczy tylko pasywnego `updatePeriodMillis`; event-driven
+  update'y (akcja usera, worker) są dozwolone i natychmiastowe — oczekiwane UX jest osiągalne.
+
 ## [v0.6.3] — 2026-06-12 — Widget: reaktywna treść (fix martwego odświeżania)
 - Fixed: **widget nie odświeżał się po zmianie kraju** (czasem dopiero po ~10 s, czasem wcale,
   niezależnie od urządzenia — S24 i emulator Pixel 7). PRAWDZIWA przyczyna (poprzednie hipotezy

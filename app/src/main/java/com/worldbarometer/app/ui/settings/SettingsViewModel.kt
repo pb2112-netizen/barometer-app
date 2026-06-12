@@ -1,5 +1,6 @@
 package com.worldbarometer.app.ui.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -54,20 +55,23 @@ class SettingsViewModel(
             val current = settingsStore.currentLensId()
             if (current == id) return@launch
             settingsStore.setLensId(id)
+            Log.d(TAG, "setLensId: $current -> $id")
 
             // Backstop: gdyby user wyszedł z apki od razu — WorkManager (expedited) dokończy
             // pobranie i render widgetu poza korutyną UI. Zob. requestLensChangeRefresh.
             RefreshScheduler.requestLensChangeRefresh(ServiceLocator.applicationContext)
 
-            // Szybka ścieżka (foreground): pobierz nowy lens od razu. Żywa sesja widgetu
-            // przerysuje się SAMA po zapisie cache (treść reaktywna w provideGlance);
-            // requestUpdate() pokrywa przypadek martwej sesji.
+            // Szybka ścieżka (foreground): pobierz nowy lens i wypchnij render od razu
+            // (requestUpdate renderuje bezpośrednio przez AppWidgetManager — bez sesji Glance).
             repository.refresh()
             BarometerWidgetUpdater.requestUpdate(ServiceLocator.applicationContext)
+            Log.d(TAG, "setLensId: foreground refresh+render done")
         }
     }
 
     companion object {
+        private const val TAG = "WB-Widget"
+
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
