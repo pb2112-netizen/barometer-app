@@ -2,6 +2,7 @@ package com.worldbarometer.app.work
 
 import android.content.Context
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.repo.BarometerRepository
@@ -20,17 +21,41 @@ class RefreshWorker(
     override suspend fun doWork(): Result {
         val repository = ServiceLocator.ensureInitialized(applicationContext)
         val settings = ServiceLocator.settingsStore
+        val lensChange = inputData.getBoolean(KEY_LENS_CHANGE, false)
 
-        return when (val result = repository.refresh()) {
+        val result = repository.refresh()
+
+        // Render widgetu DOPIERO PO pobraniu (cache nowego lensu jest już zapisany).
+        // Jeden render = brak gubienia drugiego update'u przez debounce Glance (~1–2 s) i brak
+        // „pustej" klatki dla świeżo wybranego kraju bez cache.
+        when (result) {
             is BarometerRepository.RefreshResult.Success -> {
                 BarometerWidgetUpdater.requestUpdate(applicationContext)
                 evaluateNotification(settings, result.snapshot.data.globalScore, result.snapshot)
-                Result.success()
+                return Result.success()
             }
-            // Błąd sieci → ponów z wykładniczym backoffem (SPEC_MVP §2).
-            is BarometerRepository.RefreshResult.Failure -> Result.retry()
+            is BarometerRepository.RefreshResult.Failure -> {
+                // Zmiana kraju offline: i tak odśwież widget (kraj + dane z cache, jeśli są) i nie ponawiaj.
+                // Cykl periodyczny w zwykłym biegu: retry z backoffem (SPEC_MVP §2).
+                return if (lensChange) {
+                    BarometerWidgetUpdater.requestUpdate(applicationContext)
+                    Result.success()
+                } else {
+                    Result.retry()
+                }
+            }
         }
     }
+
+    /**
+     * Wymagane przez expedited WorkManager na API < 31 (foreground service). Na Androidzie 12+
+     * expedited nie używa usługi foreground, więc notyfikacja się nie pokazuje.
+     */
+    override suspend fun getForegroundInfo(): ForegroundInfo =
+        ForegroundInfo(
+            Notifier.FOREGROUND_NOTIFICATION_ID,
+            Notifier(applicationContext).buildUpdatingNotification(),
+        )
 
     /**
      * Reguła (SPEC_MVP §4): score >= próg ORAZ wzrost względem poprzedniego odczytu
@@ -65,5 +90,8 @@ class RefreshWorker(
     companion object {
         /** Limit częstotliwości powiadomień: 3 h. */
         const val NOTIFICATION_COOLDOWN_MS = 3L * 60L * 60L * 1000L
+
+        /** true → ścieżka zmiany kraju: po pobraniu zawsze odśwież widget i nie ponawiaj przy błędzie. */
+        const val KEY_LENS_CHANGE = "lens_change"
     }
 }

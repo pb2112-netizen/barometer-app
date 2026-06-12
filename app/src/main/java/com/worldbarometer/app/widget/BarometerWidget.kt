@@ -81,7 +81,7 @@ private fun WidgetContent(
     val scoreText = snapshot?.let { String.format(Locale.US, "%.1f", it.data.globalScore) } ?: "—"
     val summary = snapshot?.data?.shortSummary.orEmpty()
     val context = LocalContext.current
-    val updatedText = snapshot?.let { "Updated ${RelativeTime.format(it.data.updatedAt)}" } ?: ""
+    val updatedText = snapshot?.let { "Updated ${RelativeTime.formatAbsolute(it.data.updatedAt)}" } ?: ""
     val white = ColorProvider(Color.White)
     val widgetDescription = buildWidgetContentDescription(
         snapshot = snapshot,

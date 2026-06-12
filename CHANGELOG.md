@@ -7,6 +7,29 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 
 ---
 
+## [v0.6.2] — 2026-06-12 — Widget: czas absolutny + niezawodne odświeżanie kraju
+- Fixed: „Updated" w widgecie nie kłamie po długim braku przerysowania. Czas WZGLĘDNY
+  („5 min ago") zamrażał się między cyklami workera (~60 min), bo widget Glance nie
+  przerysowuje się sam (`updatePeriodMillis=0`). Teraz czas ABSOLUTNY lokalny.
+- Changed: `RelativeTime.formatAbsolute()` — dzisiaj „HH:mm", inny dzień „d MMM, HH:mm"
+  (stare/offline dane nie wyglądają na świeże). Usunięto względny `format()` (źródło regresji).
+- Changed: spójnie absolutny czas także na dashboardzie (`MainScreen`) i w Settings (`SettingsViewModel`).
+- Changed: Settings „Last data update" — pełna data z rokiem (`formatAbsoluteFull` → „12 Jun 2026, 14:05").
+- Fixed: **kraj w widgecie nie odświeżał się po zmianie lensu** (pokazywał stary kraj aż do
+  cyklu silnika). Przyczyna: render Glance był zlecany ze zwykłej korutyny UI, którą One UI
+  (Samsung) zamrażał po wyjściu z apki, zanim render doszedł.
+- Fixed: **puste wyniki w widgecie dla krajów ≠ PL** (`—/10`, „Stable", choć w apce dane OK).
+  Przyczyna: render „kraj od razu" leciał PRZED pobraniem (cache nowego lensu pusty), a drugi
+  render z danymi był gubiony przez debounce Glance (~1–2 s). Naprawa: **jeden render PO pobraniu**.
+- Added: `RefreshScheduler.requestLensChangeRefresh()` — **expedited** one-off WorkManager
+  (REPLACE, `RUN_AS_NON_EXPEDITED_WORK_REQUEST`) jako backstop przeżywający wyjście z apki;
+  `RefreshWorker` tryb `KEY_LENS_CHANGE` (render PO refreshu) + `getForegroundInfo()`
+  wymagane przez expedited na API < 31 (cichy kanał `barometer_updates`, IMPORTANCE_MIN).
+- Changed: `SettingsViewModel.setLensId` — hybryda: szybka ścieżka w foregroundzie
+  (refresh → 1 render) dla natychmiastowości, gdy user zostaje w apce, + WorkManager jako
+  backstop, gdy wyjdzie od razu. Usunięto kruchy `requestUpdate + delay(2500) + requestUpdate`
+  oraz `GLANCE_SECOND_UPDATE_DELAY_MS`.
+
 ## [backend WB-012] — 2026-06-12 — Event summary restore (apka bez zmian kodu)
 - Fixed (silnik `barometr/`): `top_events[].summary` — regresja po multi-lens; fallback + tryb prosty.
 - Docs: weryfikacja u PO po cyklu silnika — rozwinięta karta już renderuje `summary` (`MainScreen.kt`).

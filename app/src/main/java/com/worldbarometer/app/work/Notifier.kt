@@ -1,6 +1,7 @@
 package com.worldbarometer.app.work
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -24,16 +25,41 @@ class Notifier(context: Context) {
 
     fun ensureChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val manager = appContext.getSystemService(NotificationManager::class.java) ?: return
+            val alerts = NotificationChannel(
                 CHANNEL_ID,
                 "Barometer alerts",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 description = "Notifications when the threat level rises above your threshold."
             }
-            val manager = appContext.getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
+            // Kanał MIN dla krótkiej pracy w tle (expedited WorkManager na API < 31
+            // wymaga notyfikacji foreground; ma być cicha i nienachalna).
+            val updates = NotificationChannel(
+                UPDATES_CHANNEL_ID,
+                "Background updates",
+                NotificationManager.IMPORTANCE_MIN,
+            ).apply {
+                description = "Brief, silent status while the widget refreshes in the background."
+            }
+            manager.createNotificationChannel(alerts)
+            manager.createNotificationChannel(updates)
         }
+    }
+
+    /**
+     * Cicha notyfikacja foreground dla expedited WorkManagera (wymagana na API < 31).
+     * Na Androidzie 12+ expedited działa bez usługi foreground i ta notyfikacja się nie pokazuje.
+     */
+    fun buildUpdatingNotification(): Notification {
+        ensureChannel()
+        return NotificationCompat.Builder(appContext, UPDATES_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_barometer)
+            .setContentTitle("Updating…")
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setSilent(true)
+            .setOngoing(true)
+            .build()
     }
 
     /** Zwraca true, jeśli powiadomienie zostało wysłane. */
@@ -75,6 +101,10 @@ class Notifier(context: Context) {
 
     companion object {
         const val CHANNEL_ID = "barometer_alerts"
+        const val UPDATES_CHANNEL_ID = "barometer_updates"
+
+        /** Id notyfikacji foreground dla expedited WorkManagera (osobne od alertu). */
+        const val FOREGROUND_NOTIFICATION_ID = 1002
         private const val NOTIFICATION_ID = 1001
     }
 }

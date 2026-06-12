@@ -25,41 +25,67 @@ komentarze w kodzie mogą być PL. Backend gotowy i **nieruszalny bez prośby**.
 Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-handover`).
 
 ## Bieżąca wersja
-- **App:** v0.6.1 (versionCode 10), tag `v0.6.1` (do utworzenia po build u PO), branch `master`.
-- **Remote:** `origin` → `https://github.com/pb2112-netizen/barometer-app.git` (public).
-- **Backend:** multi-lens live — `barometer_{pl,ro,pt,ua,us}.json` + `manifest.json`.
+- **App:** v0.6.2 (versionCode 11), branch `master` — zacommitowane na szczycie `master` (`git log -1`), **lokalnie, nie wypushowane**. Tag `v0.6.2` **po build u PO**.
+- **Silnik:** WB-012 wdrożony, HEAD `66752f2` na `main` (lokalnie, **nie wypushowany**).
+- **Remote apki:** `origin` → `https://github.com/pb2112-netizen/barometer-app.git` (public).
+- **Backend live:** multi-lens — `barometer_{pl,ro,pt,ua,us}.json` + `manifest.json` (JSON jeszcze **bez** WB-012 do momentu push + cyklu silnika).
 
 ## Stan na teraz
-- **Done:** MVP, Legal (WB-004), widget trend (WB-002), branding (WB-007), country lens (WB-008), lens visibility (WB-011), **event summary restore (WB-012 — silnik)**.
-- **WB-011 u PO (częściowo):** chip „Scoring for:” + klikalny kraj OK; widget — pin + nazwa kraju w rogu OK.
-- **WB-008 zweryfikowane u PO:** picker Settings, zmiana lens → dashboard OK; widget **wolno / nie reaguje** na zmianę kraju (patrz otwarte problemy).
-- **Silnik:** JSON na GitHubie HTTP 200; cron przez cron-job.org → `workflow_dispatch`.
-- **Repo apki:** git w `WorldBarometer/`, remote skonfigurowany, `master` + tagi na GitHubie.
-- **Build:** tylko u usera w Android Studio — kontener bez Android SDK.
+- **Done (sesja 2026-06-12, v0.6.2):** widget — (a) „Updated"/UI = **czas absolutny** (`RelativeTime.formatAbsolute`, Settings pełna data z rokiem); (b) **fix pustego widgetu dla krajów ≠ PL** — render PO pobraniu (koniec gubienia update'u przez debounce Glance) — **✅ zweryfikowane u PO: widget znów pokazuje poprawne dane**; (c) odświeżanie kraju = hybryda foreground + expedited WorkManager backstop (`SettingsViewModel.setLensId`, `requestLensChangeRefresh`, `RefreshWorker` tryb `KEY_LENS_CHANGE`) — **latencja BEZ zmian, patrz „Problem do następnej sesji"**.
+- **Done (sesja 2026-06-12):** WB-012 — `_ensure_event_summaries()`, prompt AI, tryb prosty; apka bez zmian kodu (`EventCard` już renderuje `summary`).
+- **Done wcześniej:** MVP, Legal (WB-004), widget trend (WB-002), branding (WB-007), country lens (WB-008), lens visibility (WB-011).
+- **WB-011 u PO (częściowo):** chip „Scoring for:” + klikalny kraj OK; widget — pin + nazwa kraju OK.
+- **Build:** tylko u PO w Android Studio — kontener bez Android SDK.
 
 ## Następne kroki (priorytet ↓)
-1. **Play Store (WB-009+)** — listing EN, Data safety, assety w `design/play-store/`.
-2. **Privacy URL publiczny (WB-010)** — wymagany przed publikacją Store.
-3. Po build u PO: commit + `git push` + tag `v0.6.1`.
-4. **WB-012 weryfikacja u PO** — po cyklu silnika: rozwinięta karta Top event pokazuje opis nad Sources (apka bez zmian kodu).
-5. Tłumaczenia PL/EN UI; `@Preview`; testy jednostkowe core.
-
-**Do zaadresowania później (nie blokują Store na razie):**
-- **Widget — szybkie odświeżenie po zmianie kraju** (WB-011 follow-up): po wyborze lens w Settings widget
-  aktualizuje się z opóźnieniem lub wcale; dashboard reaguje od razu. Próbowane: `currentSnapshot()`,
-  `BarometerWidgetUpdater`, Glance Widget State (`PreferencesGlanceStateDefinition`), podwójne `update()` z delay —
-  **bez potwierdzonego fix u PO**; dalsze debugowanie wstrzymane. Podejrzenie: limit sesji Glance + launcher/OEM.
-  Pliki: `BarometerWidget.kt`, `BarometerWidgetUpdater.kt`, `BarometerWidgetState.kt`, `SettingsViewModel.setLensId`.
+1. **`git push`:** `WorldBarometer` (v0.6.2, commit na szczycie `master`) + `barometr` (WB-012, commit lokalny) — oba lokalnie, nie wypushowane.
+2. **Cykl silnika** po pushu `barometr` → sprawdź niepuste `top_events[].summary` we wszystkich 5 plikach JSON.
+3. **Weryfikacja u PO — WB-012:** pull-to-refresh w apce → rozwinięta karta Top event: akapit opisu **nad** „Sources".
+4. **Build u PO → tag `v0.6.2`:** Android Studio → Run → `git push origin --tags`.
+5. **Play Store (WB-009+)** + **Privacy URL (WB-010)** przed publikacją.
 
 ## Otwarte problemy
-- **Widget nie nadąża za zmianą kraju** — patrz „Do zaadresowania później” wyżej; model telefonu/launcher do ustalenia przy kolejnej sesji.
-- **Build tylko u usera** — brak Android SDK w kontenerze deweloperskim.
-- **`gradle-wrapper.jar` nie w repo** — Android Studio dogeneruje przy sync lub `gradle wrapper`.
+- **Latencja odświeżania widgetu po zmianie kraju** — patrz dedykowana sekcja niżej (temat na następną sesję).
+- **WB-012 nie zweryfikowane u PO** — czeka push silnika + cykl + refresh apki.
+- **Build tylko u usera** — brak Android SDK w kontenerze.
+- **`gradle-wrapper.jar` nie w repo** — Android Studio dogeneruje przy sync.
 - **PAT cron-job.org wygasa** (backend) — przy 401 odnowić token w repo `barometr`.
 
-## Szybki git (apka)
+## Problem do następnej sesji: LATENCJA odświeżania widgetu (kraj/„Updated")
+> Treść (jaki kraj/score) jest już POPRAWNA. Otwarty jest **czas reakcji** widgetu na zmianę kraju.
+> NIE zaczynaj od nowa diagnozy — niżej jest cały kontekst.
+
+- **Objaw (S24, One UI, ustawienia domyślne):** po zmianie kraju widget aktualizuje się dopiero gdy
+  user **zostaje w apce ~kilkanaście s**. Szybkie wyjście z apki = render się nie dokańcza (proces
+  zamrażany), a kolejne przełączenia bywają „kolejkowane".
+- **Potwierdzone:** zostanie w apce ~15 s naprawia objaw → to **kwestia czasu na dokończenie renderu**,
+  nie błąd treści. Sieć jest szybka (GitHub raw, 304), więc to nie network.
+- **Co już zrobiono (v0.6.2, NIE pomogło na latencję):**
+  - hybryda w `SettingsViewModel.setLensId`: szybka ścieżka foreground (`refresh()` → 1× `requestUpdate`)
+    + **expedited** WorkManager backstop (`RefreshScheduler.requestLensChangeRefresh`, REPLACE,
+    `RUN_AS_NON_EXPEDITED_WORK_REQUEST`);
+  - 1 render PO pobraniu (usunął gubienie update'u przez debounce Glance — to naprawiło PUSTY widget).
+- **Najsilniejsza hipoteza:** One UI/Samsung zamraża/ubija proces apki po wyjściu i **dławi/odracza
+  start expedited workera** (limit quota expedited + agresywny „sleeping apps"). `update()` Glance
+  (RemoteViews) i tak musi dojść w żywym procesie. To głównie strona telefonu, której kodem do końca
+  nie pokonamy.
+- **Do sprawdzenia/rozważenia w następnej sesji:**
+  1. **Diagnostyka atrybucji:** S24 → Bateria apki = „Bez ograniczeń", wyłącz „sleeping apps”; sprawdź
+     czy latencja znika (potwierdzi udział telefonu).
+  2. **Logcat** przy zmianie kraju: czy/kiedy startuje `RefreshWorker` (expedited vs odroczony), czy
+     proces jest freezowany.
+  3. Czy quota expedited się wyczerpuje przy serii przełączeń (stąd „kolejkowanie”).
+  4. Ewentualnie: zaakceptować latencję (rzadka akcja) + drobny feedback w UI, zamiast walczyć z One UI.
+- **Pliki:** `widget/BarometerWidget*.kt`, `work/RefreshWorker.kt`, `work/RefreshScheduler.kt`,
+  `ui/settings/SettingsViewModel.kt`, `xml/barometer_widget_info.xml` (`updatePeriodMillis=0`).
+
+## Szybki git
 ```bash
-cd /workspaces/Agenci_SEO/WB/WorldBarometer   # lub E:\AI\Agenci_SEO\WB\WorldBarometer
-git status && git push && git push origin --tags   # tagi tylko przy nowej wersji
+# Silnik (WB-012)
+cd /workspaces/Agenci_SEO/WB/barometr && git push origin main
+
+# Apka (v0.6.2 — commit + push; tag dopiero po build u PO)
+cd /workspaces/Agenci_SEO/WB/WorldBarometer && git push origin master
+# po build: git tag v0.6.2 && git push origin --tags
 ```
-Commit z inline identity → `PROJECT.md` §7. **Nie** commituj z root `Agenci_SEO/` — to inny folder.
+Commit z inline identity → `PROJECT.md` §7. **Nie** commituj z root `Agenci_SEO/`.
