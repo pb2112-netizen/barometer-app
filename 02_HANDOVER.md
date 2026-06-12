@@ -26,9 +26,9 @@ Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-han
 
 ## Bieżąca wersja
 - **App:** v0.6.2 (versionCode 11), branch `master` — **wypushowane do `origin/master`** (GitHub = lokalny). Tag `v0.6.2` **po build u PO**.
-- **Silnik:** WB-012 wdrożony, HEAD `66752f2` na `main` (lokalnie, **nie wypushowany**).
+- **Silnik:** WB-012 **wypushowany** do `origin/main` (kod scalony z auto-commitami JSON, merge commit).
 - **Remote apki:** `origin` → `https://github.com/pb2112-netizen/barometer-app.git` (public).
-- **Backend live:** multi-lens — `barometer_{pl,ro,pt,ua,us}.json` + `manifest.json` (JSON jeszcze **bez** WB-012 do momentu push + cyklu silnika).
+- **Backend live:** multi-lens — `barometer_{pl,ro,pt,ua,us}.json` + `manifest.json`. **JSON dostanie WB-012 przy najbliższym cyklu silnika** (cron co godzinę, `~:01`).
 
 ## Stan na teraz
 - **Done (sesja 2026-06-12, v0.6.2):** widget — (a) „Updated"/UI = **czas absolutny** (`RelativeTime.formatAbsolute`, Settings pełna data z rokiem); (b) **fix pustego widgetu dla krajów ≠ PL** — render PO pobraniu (koniec gubienia update'u przez debounce Glance) — **✅ zweryfikowane u PO: widget znów pokazuje poprawne dane**; (c) odświeżanie kraju = hybryda foreground + expedited WorkManager backstop (`SettingsViewModel.setLensId`, `requestLensChangeRefresh`, `RefreshWorker` tryb `KEY_LENS_CHANGE`) — **latencja BEZ zmian, patrz „Problem do następnej sesji"**.
@@ -38,11 +38,10 @@ Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-han
 - **Build:** tylko u PO w Android Studio — kontener bez Android SDK.
 
 ## Następne kroki (priorytet ↓)
-1. **`git push` silnika:** `barometr` (WB-012, commit lokalny, **nie wypushowany**). Apka v0.6.2 już na GitHubie.
-2. **Cykl silnika** po pushu `barometr` → sprawdź niepuste `top_events[].summary` we wszystkich 5 plikach JSON.
-3. **Weryfikacja u PO — WB-012:** pull-to-refresh w apce → rozwinięta karta Top event: akapit opisu **nad** „Sources".
-4. **Build u PO → tag `v0.6.2`:** Android Studio → Run → `git push origin --tags`.
-5. **Play Store (WB-009+)** + **Privacy URL (WB-010)** przed publikacją.
+1. **Cykl silnika** (po pushu WB-012, ~:01) → sprawdź niepuste `top_events[].summary` we wszystkich 5 plikach JSON. Apka v0.6.2 i silnik WB-012 już na GitHubie.
+2. **Weryfikacja u PO — WB-012:** pull-to-refresh w apce → rozwinięta karta Top event: akapit opisu **nad** „Sources".
+3. **Build u PO → tag `v0.6.2`:** Android Studio → Run → `git push origin --tags`.
+4. **Play Store (WB-009+)** + **Privacy URL (WB-010)** przed publikacją.
 
 ## Otwarte problemy
 - **Latencja odświeżania widgetu po zmianie kraju** — patrz dedykowana sekcja niżej (temat na następną sesję).
@@ -80,12 +79,13 @@ Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-han
   `ui/settings/SettingsViewModel.kt`, `xml/barometer_widget_info.xml` (`updatePeriodMillis=0`).
 
 ## Szybki git
+Apka (`master`) i silnik (`main`) są zsynchronizowane z GitHub. Uwagi na przyszłość:
 ```bash
-# Silnik (WB-012)
-cd /workspaces/Agenci_SEO/WB/barometr && git push origin main
+# Silnik publikuje JSON co godzinę (GitHub Actions) → przed pushem ZAWSZE:
+cd /workspaces/Agenci_SEO/WB/barometr && git fetch origin && git merge origin/main && git push origin main
 
-# Apka (v0.6.2 — commit + push; tag dopiero po build u PO)
+# Apka:
 cd /workspaces/Agenci_SEO/WB/WorldBarometer && git push origin master
-# po build: git tag v0.6.2 && git push origin --tags
+# po build u PO: git tag v0.6.2 && git push origin --tags
 ```
 Commit z inline identity → `PROJECT.md` §7. **Nie** commituj z root `Agenci_SEO/`.
