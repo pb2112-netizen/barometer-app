@@ -56,11 +56,12 @@ class SettingsViewModel(
             settingsStore.setLensId(id)
 
             // Backstop: gdyby user wyszedł z apki od razu — WorkManager (expedited) dokończy
-            // pobranie i render widgetu poza procesem UI. Zob. requestLensChangeRefresh.
+            // pobranie i render widgetu poza korutyną UI. Zob. requestLensChangeRefresh.
             RefreshScheduler.requestLensChangeRefresh(ServiceLocator.applicationContext)
 
-            // Szybka ścieżka (foreground, proces żyje): pobierz nowy lens i odśwież widget OD RAZU,
-            // bez czekania na start workera. Render dopiero PO pobraniu → brak pustej klatki.
+            // Szybka ścieżka (foreground): pobierz nowy lens od razu. Żywa sesja widgetu
+            // przerysuje się SAMA po zapisie cache (treść reaktywna w provideGlance);
+            // requestUpdate() pokrywa przypadek martwej sesji.
             repository.refresh()
             BarometerWidgetUpdater.requestUpdate(ServiceLocator.applicationContext)
         }

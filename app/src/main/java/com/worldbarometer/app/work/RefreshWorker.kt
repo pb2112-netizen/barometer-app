@@ -25,9 +25,9 @@ class RefreshWorker(
 
         val result = repository.refresh()
 
-        // Render widgetu DOPIERO PO pobraniu (cache nowego lensu jest już zapisany).
-        // Jeden render = brak gubienia drugiego update'u przez debounce Glance (~1–2 s) i brak
-        // „pustej" klatki dla świeżo wybranego kraju bez cache.
+        // update() PO pobraniu (cache jest już zapisany) — restartuje martwą sesję Glance,
+        // która od razu czyta świeży cache. Żywa sesja i tak przerysowała się sama po zapisie
+        // (treść reaktywna w provideGlance).
         when (result) {
             is BarometerRepository.RefreshResult.Success -> {
                 BarometerWidgetUpdater.requestUpdate(applicationContext)

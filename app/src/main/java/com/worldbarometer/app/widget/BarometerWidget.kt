@@ -3,6 +3,8 @@ package com.worldbarometer.app.widget
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -16,10 +18,6 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
-import androidx.datastore.preferences.core.Preferences
-import androidx.glance.appwidget.state.getAppWidgetState
-import androidx.glance.state.GlanceStateDefinition
-import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -44,6 +42,7 @@ import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
+import kotlinx.coroutines.flow.scan
 import java.util.Locale
 
 /** Wysokość cyfry score — ikona trendu ma ten sam rozmiar wizualny. */
@@ -56,17 +55,26 @@ private val TrendIconSize = 34.dp
  */
 class BarometerWidget : GlanceAppWidget() {
 
-    override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
-
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = ServiceLocator.ensureInitialized(context)
-        val glanceState = getAppWidgetState<Preferences>(context, id)
-        val lensId = glanceState[BarometerWidgetStateKeys.LENS_ID]
-            ?: ServiceLocator.settingsStore.currentLensId()
-        val countryName = glanceState[BarometerWidgetStateKeys.COUNTRY_NAME]
-            ?: LensCatalog.nameFor(lensId)
-        val snapshot = repository.currentSnapshot()
+        val settings = ServiceLocator.settingsStore
+        // Wartości startowe — pierwsza klatka bez „pustego" widgetu.
+        val initialLensId = settings.currentLensId()
+        val initialSnapshot = repository.currentSnapshot()
         provideContent {
+            // KLUCZOWE: dane czytane WEWNĄTRZ kompozycji (flow → collectAsState).
+            // Żywa sesja Glance przy update() tylko REKOMPONUJE — wartości złapane przed
+            // provideContent byłyby zamrożone do wygaśnięcia sesji (historyczna przyczyna
+            // „martwego" widgetu po zmianie kraju). Dzięki flow każda zmiana cache/lensu
+            // w DataStore sama przerysowuje żywą sesję; update() z workerów obsługuje
+            // wyłącznie restart sesji martwej.
+            // scan: zatrzymuje ostatni niepusty snapshot — przy zmianie kraju widget pokazuje
+            // stary kraj+dane aż nowy cache się pojawi, potem przełącza ATOMOWO (bez pustej
+            // klatki i bez etykiety nowego kraju nad danymi starego).
+            val snapshot by repository.observe()
+                .scan(initialSnapshot) { previous, next -> next ?: previous }
+                .collectAsState(initial = initialSnapshot)
+            val countryName = LensCatalog.nameFor(snapshot?.lensId ?: initialLensId)
             WidgetContent(snapshot = snapshot, countryName = countryName)
         }
     }

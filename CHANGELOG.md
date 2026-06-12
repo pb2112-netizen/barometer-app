@@ -7,6 +7,23 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 
 ---
 
+## [v0.6.3] — 2026-06-12 — Widget: reaktywna treść (fix martwego odświeżania)
+- Fixed: **widget nie odświeżał się po zmianie kraju** (czasem dopiero po ~10 s, czasem wcale,
+  niezależnie od urządzenia — S24 i emulator Pixel 7). PRAWDZIWA przyczyna (poprzednie hipotezy
+  One UI/expedited błędne): `provideGlance` czytał snapshot/lens JEDNORAZOWO przed `provideContent`.
+  Glance trzyma żywą sesję kompozycji per widget; `update()` na żywej sesji tylko REKOMPONUJE
+  (nie uruchamia ponownie `provideGlance`), więc renderował wartości zamrożone w domknięciu.
+  Działało tylko gdy sesja zdążyła wygasnąć (timeout) — stąd losowość i „działa po cyklu silnika".
+- Changed: `BarometerWidget.provideGlance` — treść czytana WEWNĄTRZ kompozycji:
+  `repository.observe()` + `settings.lensId` przez `collectAsState`; `scan` trzyma ostatni
+  niepusty snapshot (kraj+dane przełączają się atomowo po zapisie nowego cache — zachowany
+  fix „pustego widgetu" z v0.6.2). Kraj w badge = lens FAKTYCZNIE pokazywanych danych.
+- Changed: `BarometerWidgetUpdater` — tylko `update()` per instancja (restart martwej sesji);
+  usunięto zapis stanu Glance (`updateAppWidgetState`) i plik `BarometerWidgetState.kt` —
+  stan Glance niepotrzebny, źródłem prawdy jest DataStore.
+- Unchanged: hybryda foreground + expedited backstop z v0.6.2 (nadal potrzebna: worker
+  przeżywa wyjście z apki i restartuje martwą sesję po pobraniu).
+
 ## [v0.6.2] — 2026-06-12 — Widget: czas absolutny + niezawodne odświeżanie kraju
 - Fixed: „Updated" w widgecie nie kłamie po długim braku przerysowania. Czas WZGLĘDNY
   („5 min ago") zamrażał się między cyklami workera (~60 min), bo widget Glance nie
