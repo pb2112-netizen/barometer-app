@@ -23,6 +23,9 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
   stan Glance niepotrzebny, źródłem prawdy jest DataStore.
 - Unchanged: hybryda foreground + expedited backstop z v0.6.2 (nadal potrzebna: worker
   przeżywa wyjście z apki i restartuje martwą sesję po pobraniu).
+- Fixed: kontrast nazwy kraju w chipie „Scoring for:" w light mode — `primary` (calmTeal
+  `0xFF8FB8B2`) ginął na jasnym tle chipa; nowy `BrandPalette.calmTealDeep` (`0xFF3E6B64`)
+  tylko dla light (dark bez zmian, globalny `primary` nieruszony — używa go Settings).
 
 ## [v0.6.2] — 2026-06-12 — Widget: czas absolutny + niezawodne odświeżanie kraju
 - Fixed: „Updated" w widgecie nie kłamie po długim braku przerysowania. Czas WZGLĘDNY
