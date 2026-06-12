@@ -25,7 +25,7 @@ komentarze w kodzie mogą być PL. Backend gotowy i **nieruszalny bez prośby**.
 Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-handover`).
 
 ## Bieżąca wersja
-- **App:** v0.6.2 (versionCode 11), branch `master` — zacommitowane na szczycie `master` (`git log -1`), **lokalnie, nie wypushowane**. Tag `v0.6.2` **po build u PO**.
+- **App:** v0.6.2 (versionCode 11), branch `master` — **wypushowane do `origin/master`** (GitHub = lokalny). Tag `v0.6.2` **po build u PO**.
 - **Silnik:** WB-012 wdrożony, HEAD `66752f2` na `main` (lokalnie, **nie wypushowany**).
 - **Remote apki:** `origin` → `https://github.com/pb2112-netizen/barometer-app.git` (public).
 - **Backend live:** multi-lens — `barometer_{pl,ro,pt,ua,us}.json` + `manifest.json` (JSON jeszcze **bez** WB-012 do momentu push + cyklu silnika).
@@ -38,7 +38,7 @@ Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-han
 - **Build:** tylko u PO w Android Studio — kontener bez Android SDK.
 
 ## Następne kroki (priorytet ↓)
-1. **`git push`:** `WorldBarometer` (v0.6.2, commit na szczycie `master`) + `barometr` (WB-012, commit lokalny) — oba lokalnie, nie wypushowane.
+1. **`git push` silnika:** `barometr` (WB-012, commit lokalny, **nie wypushowany**). Apka v0.6.2 już na GitHubie.
 2. **Cykl silnika** po pushu `barometr` → sprawdź niepuste `top_events[].summary` we wszystkich 5 plikach JSON.
 3. **Weryfikacja u PO — WB-012:** pull-to-refresh w apce → rozwinięta karta Top event: akapit opisu **nad** „Sources".
 4. **Build u PO → tag `v0.6.2`:** Android Studio → Run → `git push origin --tags`.
