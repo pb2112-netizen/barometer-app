@@ -158,7 +158,7 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         }
 
         Text(
-            text = "Updated: ${RelativeTime.format(data.updatedAt)}",
+            text = "Updated: ${RelativeTime.formatAbsolute(data.updatedAt)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

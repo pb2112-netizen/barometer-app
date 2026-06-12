@@ -6,8 +6,9 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.di.ServiceLocator
 /**
- * Odświeżanie widgetu. Glance uruchamia `provideGlance` przez WorkManager i może
- * zignorować kolejne `update()` wywołane w ciągu ~1–2 s — stąd opóźnione drugie odświeżenie.
+ * Odświeżanie widgetu: zapis aktywnego lensu/kraju do stanu Glance + `update()` każdej instancji.
+ * Wołane z procesu, który ma przeżyć render — w tle z `RefreshWorker` (też przy zmianie kraju,
+ * patrz `RefreshScheduler.requestLensChangeRefresh`), nie z krótkiej korutyny UI.
  */
 object BarometerWidgetUpdater {
 
@@ -34,7 +35,4 @@ object BarometerWidgetUpdater {
             widget.update(appContext, glanceId)
         }
     }
-
-    /** Opóźnienie przed ponownym `update()` — Glance często ignoruje wywołania w ciągu ~1–2 s. */
-    const val GLANCE_SECOND_UPDATE_DELAY_MS = 2_500L
 }
