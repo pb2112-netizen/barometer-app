@@ -38,6 +38,7 @@ private fun TopEvent.sanitized(): TopEvent = copy(
     title = title.sanitizeText(MAX_TITLE),
     summary = summary.sanitizeText(MAX_EVENT_SUMMARY),
     score = score.clampScore(),
+    sentiment = sentiment?.sanitizeText(20),
     nowosc = nowosc?.sanitizeText(40),
     category = category?.sanitizeText(40),
     sources = sources.asSequence()
@@ -53,6 +54,7 @@ fun BarometerData.sanitized(): BarometerData = copy(
     rationale = rationale.sanitizeText(MAX_RATIONALE),
     topEvents = topEvents.take(MAX_EVENTS).map { it.sanitized() },
     levelLabel = levelLabel?.sanitizeText(20),
+    tone = tone?.sanitizeText(20),
     trend = trend?.sanitizeText(20),
     // updated_at walidowane przy parsowaniu czasu (RelativeTime); tryb tylko do podglądu.
     tryb = tryb.sanitizeText(80),

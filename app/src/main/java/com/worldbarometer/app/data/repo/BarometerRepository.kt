@@ -1,6 +1,7 @@
 package com.worldbarometer.app.data.repo
 
 import com.worldbarometer.app.core.Level
+import com.worldbarometer.app.core.Tone
 import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.core.sanitized
 import com.worldbarometer.app.data.local.BarometerStore
@@ -29,7 +30,9 @@ class BarometerRepository(
         val fetchedAtMillis: Long,
         val lensId: String,
     ) {
-        val level: Level get() = Level.resolve(data.levelLabel, data.globalScore)
+        // WB-014: pasmo wyłącznie ze score (level_label z JSON = legacy, ignorowany).
+        val level: Level get() = Level.fromScore(data.globalScore)
+        val tone: Tone get() = Tone.fromString(data.tone)
         val trend: Trend get() = Trend.fromString(data.trend)
 
         fun isStale(nowMillis: Long, maxAgeMillis: Long = STALE_AFTER_MILLIS): Boolean =

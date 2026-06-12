@@ -38,7 +38,9 @@ import com.worldbarometer.app.MainActivity
 import com.worldbarometer.app.R
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.Level
+import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
+import com.worldbarometer.app.core.Tone
 import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
@@ -85,16 +87,23 @@ private fun WidgetContent(
     snapshot: BarometerRepository.Snapshot?,
     countryName: String,
 ) {
+    // Brak danych (stary cache / pierwsza klatka) -> Calm + NEUTRAL (WB-015 AC-1, T4).
     val level = snapshot?.level ?: Level.STABLE
+    val tone = snapshot?.tone ?: Tone.NEUTRAL
     val scoreText = snapshot?.let { String.format(Locale.US, "%.1f", it.data.globalScore) } ?: "—"
     val summary = snapshot?.data?.shortSummary.orEmpty()
     val context = LocalContext.current
+    // Etykieta ze wspólnego słownika WB-014 (jedno źródło prawdy z dashboardem — AC-3).
+    val levelLabel = context.getString(LevelPalette.labelRes(level, tone))
     val updatedText = snapshot?.let { "Updated ${RelativeTime.formatAbsolute(it.data.updatedAt)}" } ?: ""
     val white = ColorProvider(Color.White)
     val widgetDescription = buildWidgetContentDescription(
+        context = context,
         snapshot = snapshot,
         scoreText = scoreText,
-        levelLabel = level.label,
+        levelLabel = levelLabel,
+        level = level,
+        tone = tone,
         countryName = countryName,
         updatedText = updatedText,
     )
@@ -102,7 +111,7 @@ private fun WidgetContent(
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ImageProvider(backgroundFor(level)))
+            .background(ImageProvider(backgroundFor(level, tone)))
             .semantics { contentDescription = widgetDescription }
             .clickable(actionStartActivity(Intent(context, MainActivity::class.java)))
             .padding(14.dp),
@@ -124,7 +133,7 @@ private fun WidgetContent(
                 }
 
                 Text(
-                    text = level.label,
+                    text = levelLabel,
                     style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium),
                 )
 
@@ -203,21 +212,47 @@ private fun TrendIconGlance(trend: Trend) {
 }
 
 private fun buildWidgetContentDescription(
+    context: Context,
     snapshot: BarometerRepository.Snapshot?,
     scoreText: String,
     levelLabel: String,
+    level: Level,
+    tone: Tone,
     countryName: String,
     updatedText: String,
 ): String {
     if (snapshot == null) return "World Barometer"
     val updatedPart = updatedText.removePrefix("Updated ").lowercase(Locale.US)
-    return "World Barometer $scoreText ${levelLabel.lowercase(Locale.US)}, for $countryName, updated $updatedPart"
+    // Ton dokładany tylko w pasmach sygnału (score >= 5) — WB-015 §4.4, spójnie z WB-014 §4.6.
+    val tonePart = if (level.isCalmBand) {
+        ""
+    } else {
+        " — ${context.getString(LevelPalette.tonePhraseRes(tone))}"
+    }
+    return "World Barometer $scoreText ${levelLabel.lowercase(Locale.US)}$tonePart, " +
+        "for $countryName, updated $updatedPart"
 }
 
-private fun backgroundFor(level: Level): Int = when (level) {
-    Level.STABLE -> R.drawable.widget_bg_stable
-    Level.LOW -> R.drawable.widget_bg_low
-    Level.ELEVATED -> R.drawable.widget_bg_elevated
-    Level.HIGH -> R.drawable.widget_bg_high
-    Level.CRITICAL -> R.drawable.widget_bg_critical
+/**
+ * Tło z pary (pasmo score x ton) — macierz WB-015 §4.1: 2 tła spokoju (bez tonowania)
+ * + 3 pasma sygnału x 3 tony. Negative = dotychczasowe gradienty sygnałowe.
+ */
+private fun backgroundFor(level: Level, tone: Tone): Int = when (level) {
+    Level.STABLE -> R.drawable.widget_bg_calm
+    Level.LOW -> R.drawable.widget_bg_quiet
+    Level.ELEVATED -> when (tone) {
+        Tone.NEGATIVE -> R.drawable.widget_bg_mid_negative
+        Tone.NEUTRAL -> R.drawable.widget_bg_mid_neutral
+        Tone.POSITIVE -> R.drawable.widget_bg_mid_positive
+    }
+    Level.HIGH -> when (tone) {
+        Tone.NEGATIVE -> R.drawable.widget_bg_high_negative
+        Tone.NEUTRAL -> R.drawable.widget_bg_high_neutral
+        Tone.POSITIVE -> R.drawable.widget_bg_high_positive
+    }
+    Level.CRITICAL -> when (tone) {
+        Tone.NEGATIVE -> R.drawable.widget_bg_top_negative
+        Tone.NEUTRAL -> R.drawable.widget_bg_top_neutral
+        Tone.POSITIVE -> R.drawable.widget_bg_top_positive
+    }
 }

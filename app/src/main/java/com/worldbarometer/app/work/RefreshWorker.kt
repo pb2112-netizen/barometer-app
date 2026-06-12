@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
@@ -81,7 +82,10 @@ class RefreshWorker(
         if (config.notificationsEnabled && score >= config.threshold && isRising && cooldownPassed) {
             val sent = Notifier(applicationContext).notifyAlert(
                 score = score,
-                levelLabel = snapshot.level.label,
+                // Etykieta ze wspólnego słownika (pasmo x ton) — spójna z dashboardem/widgetem.
+                levelLabel = applicationContext.getString(
+                    LevelPalette.labelRes(snapshot.level, snapshot.tone),
+                ),
                 summary = snapshot.data.shortSummary,
             )
             if (sent) settings.recordNotification(now)
