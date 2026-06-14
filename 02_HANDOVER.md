@@ -25,30 +25,29 @@ komentarze w kodzie mogą być PL. Backend gotowy i **nieruszalny bez prośby**.
 Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-handover`).
 
 ## Bieżąca wersja
-- **App:** v0.8.0 (versionCode 15), branch `master`. Tag **po build i teście u PO**.
-- **Silnik:** WB-003 + WB-017/018/019 **na `origin/main`** (commit `0d7f108`). Następny cykl GA ~:01 — weryfikacja JSON.
+- **App:** v0.8.0 (versionCode 15), branch `master`, commit `fbf979d` na `origin/master`.
+  Build + test u PO ✅ (sparkline dashboard + widget). Tag `v0.8.0` — **do założenia**.
+- **Silnik:** WB-003 + WB-017/018/019 na `origin/main` (commit `0d7f108`). `score_history` w JSON live.
 - **Remote apki:** `origin` → `https://github.com/pb2112-netizen/barometer-app.git` (public).
-- **Backend live:** multi-lens; po najbliższym cyklu GA — `score_history` w JSON (WB-003).
+- **Backend live:** multi-lens + `score_history` 72h (WB-003).
 
 ## Stan na teraz
-- **Done (sesja 2026-06-14, WB-003):**
-  - Silnik: `score_history` 72h w pamieci + JSON; helpery `_dopisz/_przytnij/_migruj`.
-  - Apka: `Sparkline.kt`, dashboard (score `/10`, sparkline, kotwice czasu), widget mini sparkline.
-  - Usunięto `TrendArrow`, `ScoreBar`, `ic_trend_*`. Szczegóły → CHANGELOG obu repo.
-- **Done wcześniej:** v0.7.0 WB-014/015, silnik WB-013/017/018/019, widget refresh fix, MVP.
-- **Build apki:** tylko u PO — kontener bez Android SDK (v0.8.0 **nieskompilowany**).
+- **Done (sesja 2026-06-14, WB-003 — zamknięte):**
+  - Silnik: push `0d7f108`; `score_history` w pamieci + `barometer_{lens}.json`.
+  - Apka: push `fbf979d`; sparkline dashboard/widget; fix kompilacji (`coerceIn`, `isSystemInDarkTheme`).
+  - AGP 8.13.2 / Gradle 8.13 — build Android Studio OK u PO.
+- **Done wcześniej:** v0.7.0 WB-014/015, silnik WB-013/017/018/019, widget refresh, MVP.
+- **Build apki:** tylko u PO — kontener bez Android SDK.
 
 ## Następne kroki (priorytet ↓)
-1. **Weryfikacja po cyklu GA** (~:01): `score_history` w `barometer_pl.json`, decay/retoryka bez regresji, punkt bieżący = `global_score`.
-2. **Build + test u PO (v0.8.0):** sparkline dashboard (puls ≥3 pkt, stale/offline bez puls),
-   widget TopEnd, stary cache bez `score_history`, TalkBack.
-3. **Po teście u PO:** `git tag v0.8.0 && git push origin --tags`.
-4. **Kalibracja (3–5 dni po push):** rozkład score; kształt sparkline vs rzeczywistość.
-5. **Play Store (WB-009+)** + **Privacy URL (WB-010)** — po stabilnym v0.8.0.
+1. **Tag release:** `git tag v0.8.0 && git push origin --tags` (repo apki).
+2. **Kalibracja (3–5 dni):** rozkład score ~90% cykli 1–3; kształt sparkline vs decay WB-017.
+3. **Play Store (WB-009+)** + **Privacy URL (WB-010)** — po stabilnym v0.8.0 w produkcji.
+4. **Opcjonalnie:** pełna regresja JSON po GA (decay UA, cap retoryki ≤3.0) — jeśli nie sprawdzono ręcznie.
 
 ## Otwarte problemy
-- **v0.8.0 nieskompilowane u PO** — build Android Studio.
-- **Sparkline rozgrzewka** — <3 punkty: wykres bez puls; oczekiwane do ~3 cykli GA.
+- **Tag v0.8.0 nie założony** — punkt powrotu (decyzja PO).
+- **Sparkline rozgrzewka** — <3 punkty w historii: wykres bez puls; wypełnia się co cykl GA (~1 h).
 - **Build apki tylko u PO** — brak Android SDK w kontenerze.
 - **`gradle-wrapper.jar` nie w repo** — Android Studio dogeneruje przy sync.
 - **PAT cron-job.org wygasa** (backend) — przy 401 odnowić token w repo `barometr`.
@@ -60,6 +59,7 @@ cd /workspaces/Agenci_SEO/WB/barometr && git fetch origin && git merge origin/ma
 
 # Apka:
 cd /workspaces/Agenci_SEO/WB/WorldBarometer && git push origin master
-# po build i teście u PO: git tag v0.8.0 && git push origin --tags
+# tag po decyzji PO:
+git tag v0.8.0 && git push origin --tags
 ```
 Commit z inline identity → `PROJECT.md` §7. **Nie** commituj z root `Agenci_SEO/`.
