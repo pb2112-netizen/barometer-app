@@ -2,8 +2,8 @@ package com.worldbarometer.app.ui.home
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,9 +23,6 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingFlat
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -59,8 +55,8 @@ import com.worldbarometer.app.core.BrandPalette
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
+import com.worldbarometer.app.core.SparklineChart
 import com.worldbarometer.app.core.Tone
-import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.data.model.TopEvent
 import com.worldbarometer.app.data.repo.BarometerRepository
 import java.util.Locale
@@ -139,11 +135,17 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         val scoreText = String.format(Locale.US, "%.1f", data.globalScore)
+        val sparklineDescription = stringResource(
+            R.string.sparkline_content_description,
+            snapshot.trend.name.lowercase(Locale.US),
+            scoreText,
+        )
+        val enablePulse = !state.isStale && !state.isOffline && data.scoreHistory.size >= 3
         // a11y (WB-014 §4.6): ton niesiony tekstem opisu — TalkBack nie polega na kolorze.
         val scoreDescription = stringResource(
             LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel,
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.Top) {
             Text(
                 text = scoreText,
                 color = levelColor,
@@ -151,14 +153,40 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { contentDescription = scoreDescription },
             )
-            Spacer(Modifier.size(8.dp))
-            TrendArrow(snapshot.trend, tone)
+            Text(
+                text = "/10",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 2.dp),
+            )
         }
 
         LevelPill(label = levelLabel, color = levelColor)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
-        ScoreBar(score = data.globalScore, color = levelColor)
+        SparklineChart(
+            history = data.scoreHistory,
+            updatedAt = data.updatedAt,
+            lastPointColor = levelColor,
+            enablePulse = enablePulse,
+            contentDescription = sparklineDescription,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.sparkline_anchor_past),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.sparkline_anchor_now),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.height(16.dp))
 
         if (data.shortSummary.isNotBlank()) {
@@ -231,36 +259,6 @@ private fun EventsSection(events: List<TopEvent>) {
 }
 
 @Composable
-private fun TrendArrow(trend: Trend, tone: Tone) {
-    // Kształty strzałek bez zmian (WB-014 §4.4) — zmienia się tylko kolor i opis.
-    val icon: ImageVector = when (trend) {
-        Trend.RISING -> Icons.Filled.TrendingUp
-        Trend.FALLING -> Icons.Filled.TrendingDown
-        Trend.STABLE -> Icons.Filled.TrendingFlat
-    }
-    val description = if (trend == Trend.RISING) {
-        stringResource(
-            R.string.trend_description_rising,
-            stringResource(
-                when (tone) {
-                    Tone.NEGATIVE -> R.string.tone_word_negative
-                    Tone.POSITIVE -> R.string.tone_word_positive
-                    Tone.NEUTRAL -> R.string.tone_word_neutral
-                },
-            ),
-        )
-    } else {
-        stringResource(R.string.trend_description, trend.name.lowercase())
-    }
-    Icon(
-        imageVector = icon,
-        contentDescription = description,
-        tint = LevelPalette.trendColor(trend, tone, isSystemInDarkTheme()),
-        modifier = Modifier.size(40.dp),
-    )
-}
-
-@Composable
 private fun LevelPill(label: String, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -276,44 +274,6 @@ private fun LevelPill(label: String, color: Color) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-    }
-}
-
-@Composable
-private fun ScoreBar(score: Double, color: Color) {
-    val fraction = (score / 10.0).coerceIn(0.0, 1.0).toFloat()
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(12.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.outline),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction)
-                    .height(12.dp)
-                    .clip(CircleShape)
-                    .background(color),
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "1",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "10",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
