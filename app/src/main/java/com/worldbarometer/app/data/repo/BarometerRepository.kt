@@ -34,6 +34,7 @@ class BarometerRepository(
         val level: Level get() = Level.fromScore(data.globalScore)
         val tone: Tone get() = Tone.fromString(data.tone)
         val trend: Trend get() = Trend.fromString(data.trend)
+        val scoreHistory get() = data.scoreHistory
 
         fun isStale(nowMillis: Long, maxAgeMillis: Long = STALE_AFTER_MILLIS): Boolean =
             fetchedAtMillis <= 0L || (nowMillis - fetchedAtMillis) > maxAgeMillis

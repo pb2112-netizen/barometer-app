@@ -7,6 +7,16 @@ Format: `## [wersja] — data` + `Added/Changed/Fixed/Docs`. Wersje = tagi git w
 
 ---
 
+## [v0.8.0] — 2026-06-14 — WB-003: sparkline 72h (dashboard + widget)
+Wymaga silnika WB-003 (`score_history` w JSON). Dlaczego: trajektoria napięcia zamiast strzałki i paska 1–10.
+
+- Added: `ScoreHistoryPoint` + `BarometerData.scoreHistory`; sanityzacja w `ContentSafety`.
+- Added: `core/Sparkline.kt` — wspólny renderer (Y=1..10, osie L, puls ostatniego punktu w apce); `SparklineBitmap` dla Glance.
+- Changed: `MainScreen` — score + `/10`; sparkline pod `LevelPill`; kotwice `72h ago` / `Now`; usunięto `TrendArrow` i `ScoreBar`.
+- Changed: widget — mini sparkline TopEnd (36×24 dp); usunięto `TrendIconGlance` i `ic_trend_*`.
+- Added: `strings.xml` — kotwice czasu + `sparkline_content_description` (a11y z `trend`).
+- Pending: build u PO; produkcja JSON po push silnika WB-003.
+
 ## [v0.7.0] — 2026-06-12 — WB-014 + WB-015: dwuosiowy system kolorów (istotność × ton)
 Wydanie wspólne z silnikiem WB-013 (JSON: `tone` per lens + `sentiment` per event).
 Dlaczego: wysoki score przestaje być automatycznie „czerwony" — pozytywny przełom (koniec wojny,

@@ -25,62 +25,41 @@ komentarze w kodzie mogą być PL. Backend gotowy i **nieruszalny bez prośby**.
 Protokół docs: `.cursor/rules/barometr-handover.mdc` (MANUALNA, `@barometr-handover`).
 
 ## Bieżąca wersja
-- **App:** v0.7.0 (versionCode 14), branch `master`. Tag `v0.7.0` **po build i teście u PO**.
-- **Silnik:** WB-013 **wypushowany** do `origin/main` (commit `WB-013: importance scale + sentiment axis`).
+- **App:** v0.8.0 (versionCode 15), branch `master`. Tag **po build i teście u PO**.
+- **Silnik:** WB-003 + WB-017/018/019 **na `origin/main`** (commit `0d7f108`). Następny cykl GA ~:01 — weryfikacja JSON.
 - **Remote apki:** `origin` → `https://github.com/pb2112-netizen/barometer-app.git` (public).
-- **Backend live:** multi-lens — `barometer_{pl,ro,pt,ua,us}.json` + `manifest.json`.
-  **JSON dostanie `tone`/`sentiment` (WB-013) przy najbliższym cyklu silnika** (cron co godzinę, `~:01`).
+- **Backend live:** multi-lens; po najbliższym cyklu GA — `score_history` w JSON (WB-003).
 
 ## Stan na teraz
-- **Done (sesja 2026-06-12, WB-013/014/015 — na polecenie PO wszystkie trzy naraz):**
-  - **WB-013 (silnik):** skala istotności (8–10 także dla pozytywnych przełomów), `sentiment`
-    per event (walidacja + fallback neutral), deterministyczny `tone` per lens (`_wylicz_tone`,
-    konflikt ≤ 0.5 → neutral), tryb prosty z `SLOWA_POZYTYWNE` (ceasefire → positive, waga bez
-    zmian), cisza/decay → neutral, `level_label` legacy bez zmian, zero dodatkowych calli AI.
-    Logika przetestowana lokalnie (asercje OK).
-  - **WB-014 (dashboard):** `Tone` enum (default NEUTRAL), pola `tone`/`sentiment` w modelu,
-    `LevelPalette` = jedno źródło prawdy (pasmo × ton → etykieta/kolor/opis a11y), etykiety
-    lokalnie (level_label z JSON ignorowany), pas spokoju <5 brand teal, badge eventów per
-    (score × sentiment), trend per ton, a11y z tonem, zero nowych ikon. Szczegóły → `CHANGELOG.md`.
-  - **WB-015 (widget):** 11 gradientów (2 spokoju + 9 sygnałowych), `backgroundFor(level, tone)`,
-    etykieta ze wspólnego słownika, contentDescription z tonem przy score ≥ 5; stare tła usunięte.
-- **Uwaga — kalibracja WB-013 (spec §6) pominięta przed WB-014/015 decyzją PO** (zadania zlecone
-  razem). Bezpieczne: apka traktuje brak/zły `tone` jako NEUTRAL. Rozkład score (~90% cykli 1–3)
-  i trafność sentymentu obserwować przez 3–5 dni po wdrożeniu.
-- **Done (sesja 2026-06-12, v0.6.4):** widget odświeża się poprawnie — ✅ u PO (render przez
-  `runComposition()` + RemoteViews wprost do `AppWidgetManager`). Historia → `CHANGELOG.md`.
-- **Done wcześniej:** MVP, Legal (WB-004), widget trend (WB-002), branding (WB-007), country lens (WB-008), lens visibility (WB-011), WB-012 (summaries).
-- **Build:** tylko u PO w Android Studio — kontener bez Android SDK (kod v0.7.0 **nieskompilowany**).
+- **Done (sesja 2026-06-14, WB-003):**
+  - Silnik: `score_history` 72h w pamieci + JSON; helpery `_dopisz/_przytnij/_migruj`.
+  - Apka: `Sparkline.kt`, dashboard (score `/10`, sparkline, kotwice czasu), widget mini sparkline.
+  - Usunięto `TrendArrow`, `ScoreBar`, `ic_trend_*`. Szczegóły → CHANGELOG obu repo.
+- **Done wcześniej:** v0.7.0 WB-014/015, silnik WB-013/017/018/019, widget refresh fix, MVP.
+- **Build apki:** tylko u PO — kontener bez Android SDK (v0.8.0 **nieskompilowany**).
 
 ## Następne kroki (priorytet ↓)
-1. **Build + test u PO (v0.7.0):** Android Studio → Run. Testy wizualne WB-015 T1–T6
-   (kontrast białego tekstu na 11 tłach, „Breakthrough" na najmniejszym widgecie 110dp,
-   stary cache → NEUTRAL bez crasha, zmiana kraju, tap/refresh) + dashboard: kolory/etykiety
-   wg (pasmo × ton), TalkBack z tonem.
-2. **Weryfikacja JSON po cyklu silnika (~:01):** 5 × `barometer_*.json` ma top-level `tone`
-   i `sentiment` per event (+ niepuste summary — regresja WB-012).
-3. **Po teście u PO:** `git tag v0.7.0 && git push origin --tags`; opcjonalnie punkt powrotu
-   sprzed przebudowy kolorów: `git tag v0.6.4 50da461 && git push origin --tags`.
-4. **Kalibracja WB-013 (3–5 dni):** rozkład score per lens nadal ~90% cykli 1–3; wyrywkowo
-   trafność `sentiment` (zawieszenia broni, negocjacje, sankcje). Rozjazd → poprawki tylko w prompcie.
-5. **Play Store (WB-009+)** + **Privacy URL (WB-010)** — screenshoty dopiero po v0.7.0.
+1. **Weryfikacja po cyklu GA** (~:01): `score_history` w `barometer_pl.json`, decay/retoryka bez regresji, punkt bieżący = `global_score`.
+2. **Build + test u PO (v0.8.0):** sparkline dashboard (puls ≥3 pkt, stale/offline bez puls),
+   widget TopEnd, stary cache bez `score_history`, TalkBack.
+3. **Po teście u PO:** `git tag v0.8.0 && git push origin --tags`.
+4. **Kalibracja (3–5 dni po push):** rozkład score; kształt sparkline vs rzeczywistość.
+5. **Play Store (WB-009+)** + **Privacy URL (WB-010)** — po stabilnym v0.8.0.
 
 ## Otwarte problemy
-- **v0.7.0 nieskompilowane i niezweryfikowane u PO** — build tylko u PO; testy T1–T6 czekają.
-- **WB-013 bez fazy kalibracji** — obserwować rozkład score i sentyment 3–5 dni (patrz wyżej).
-- **Tag v0.6.4 nie założony** — punkt powrotu sprzed v0.7.0 (decyzja PO).
-- **Build tylko u usera** — brak Android SDK w kontenerze.
+- **v0.8.0 nieskompilowane u PO** — build Android Studio.
+- **Sparkline rozgrzewka** — <3 punkty: wykres bez puls; oczekiwane do ~3 cykli GA.
+- **Build apki tylko u PO** — brak Android SDK w kontenerze.
 - **`gradle-wrapper.jar` nie w repo** — Android Studio dogeneruje przy sync.
 - **PAT cron-job.org wygasa** (backend) — przy 401 odnowić token w repo `barometr`.
 
 ## Szybki git
-Apka (`master`) i silnik (`main`) są zsynchronizowane z GitHub. Uwagi na przyszłość:
 ```bash
-# Silnik publikuje JSON co godzinę (GitHub Actions) → przed pushem ZAWSZE:
+# Silnik — przed pushem ZAWSZE fetch + merge:
 cd /workspaces/Agenci_SEO/WB/barometr && git fetch origin && git merge origin/main && git push origin main
 
 # Apka:
 cd /workspaces/Agenci_SEO/WB/WorldBarometer && git push origin master
-# po build i teście u PO: git tag v0.7.0 && git push origin --tags
+# po build i teście u PO: git tag v0.8.0 && git push origin --tags
 ```
 Commit z inline identity → `PROJECT.md` §7. **Nie** commituj z root `Agenci_SEO/`.

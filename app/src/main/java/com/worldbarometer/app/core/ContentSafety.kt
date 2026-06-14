@@ -1,6 +1,7 @@
 package com.worldbarometer.app.core
 
 import com.worldbarometer.app.data.model.BarometerData
+import com.worldbarometer.app.data.model.ScoreHistoryPoint
 import com.worldbarometer.app.data.model.TopEvent
 
 /**
@@ -19,6 +20,12 @@ private const val MAX_RATIONALE = 1500
 private const val MAX_SOURCE = 40
 private const val MAX_SOURCES = 8
 private const val MAX_EVENTS = 3
+private const val MAX_HISTORY_POINTS = 72
+
+private fun ScoreHistoryPoint.sanitized(): ScoreHistoryPoint = copy(
+    timestamp = timestamp.sanitizeText(40),
+    score = score.clampScore(),
+)
 
 private fun String.sanitizeText(maxLength: Int): String {
     // Usuń znaki sterujące (poza spacją), zwiń whitespace, przytnij długość.
@@ -53,6 +60,11 @@ fun BarometerData.sanitized(): BarometerData = copy(
     shortSummary = shortSummary.sanitizeText(MAX_SUMMARY),
     rationale = rationale.sanitizeText(MAX_RATIONALE),
     topEvents = topEvents.take(MAX_EVENTS).map { it.sanitized() },
+    scoreHistory = scoreHistory
+        .map { it.sanitized() }
+        .filter { it.timestamp.isNotBlank() }
+        .sortedBy { it.timestamp }
+        .take(MAX_HISTORY_POINTS),
     levelLabel = levelLabel?.sanitizeText(20),
     tone = tone?.sanitizeText(20),
     trend = trend?.sanitizeText(20),

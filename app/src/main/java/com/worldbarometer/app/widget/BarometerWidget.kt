@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,20 +41,21 @@ import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
+import com.worldbarometer.app.core.SparklineBitmap
 import com.worldbarometer.app.core.Tone
-import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
 import kotlinx.coroutines.flow.scan
 import java.util.Locale
 
-/** Wysokość cyfry score — ikona trendu ma ten sam rozmiar wizualny. */
+/** Wysokość cyfry score; mini sparkline w prawym górnym rogu (WB-003). */
 private val ScoreFontSize = 34.sp
-private val TrendIconSize = 34.dp
+private val SparklineWidth = 36.dp
+private val SparklineHeight = 24.dp
 
 /**
  * Widget pulpitu (Glance). Tło = gradient poziomu, tekst biały.
- * Ikona trendu (↑/↓/→) w prawym górnym rogu. Tap = otwarcie aplikacji.
+ * Mini sparkline (72h) w prawym górnym rogu. Tap = otwarcie aplikacji.
  */
 class BarometerWidget : GlanceAppWidget() {
 
@@ -167,11 +169,22 @@ private fun WidgetContent(
         }
 
         if (snapshot != null) {
+            val sparklineBitmap = remember(snapshot.data.scoreHistory, snapshot.data.updatedAt) {
+                SparklineBitmap.render(
+                    context = context,
+                    history = snapshot.data.scoreHistory,
+                    updatedAt = snapshot.data.updatedAt,
+                )
+            }
             Box(
                 modifier = GlanceModifier.fillMaxSize(),
                 contentAlignment = Alignment.TopEnd,
             ) {
-                TrendIconGlance(trend = snapshot.trend)
+                Image(
+                    provider = ImageProvider(sparklineBitmap),
+                    contentDescription = null,
+                    modifier = GlanceModifier.size(SparklineWidth, SparklineHeight),
+                )
             }
         }
     }
@@ -196,21 +209,6 @@ private fun CountryBadgeGlance(countryName: String) {
     }
 }
 
-@Composable
-private fun TrendIconGlance(trend: Trend) {
-    val iconRes = when (trend) {
-        Trend.RISING -> R.drawable.ic_trend_rising
-        Trend.FALLING -> R.drawable.ic_trend_falling
-        Trend.STABLE -> R.drawable.ic_trend_stable
-    }
-    Image(
-        provider = ImageProvider(iconRes),
-        contentDescription = "Trend: ${trend.name.lowercase()}",
-        modifier = GlanceModifier.size(TrendIconSize),
-        colorFilter = ColorFilter.tint(ColorProvider(Color.White)),
-    )
-}
-
 private fun buildWidgetContentDescription(
     context: Context,
     snapshot: BarometerRepository.Snapshot?,
@@ -230,6 +228,7 @@ private fun buildWidgetContentDescription(
         " — ${context.getString(LevelPalette.tonePhraseRes(tone))}"
     }
     return "World Barometer $scoreText ${levelLabel.lowercase(Locale.US)}$tonePart, " +
+        "trend ${snapshot.trend.name.lowercase(Locale.US)} over the last 72 hours, " +
         "for $countryName, updated $updatedPart"
 }
 
