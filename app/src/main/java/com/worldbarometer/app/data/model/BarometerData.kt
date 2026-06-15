@@ -23,7 +23,7 @@ data class BarometerData(
     @SerialName("liczba_naglowkow") val headlineCount: Int = 0,
     @SerialName("lens_id") val lensId: String? = null,
     @SerialName("lens_name_en") val lensNameEn: String? = null,
-    /** WB-003: rolling 72h history of global_score (sorted ascending by t). */
+    /** WB-003/WB-029: rolling 48h history of global_score (sorted ascending by t). */
     @SerialName("score_history") val scoreHistory: List<ScoreHistoryPoint> = emptyList(),
 )
 

@@ -7,6 +7,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -15,6 +16,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.action.actionStartActivity
@@ -26,13 +28,16 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.worldbarometer.app.MainActivity
@@ -41,40 +46,42 @@ import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
+import com.worldbarometer.app.core.SignificantMarkerBitmap
+import com.worldbarometer.app.core.SignificantPeak
+import com.worldbarometer.app.core.Sparkline
 import com.worldbarometer.app.core.SparklineBitmap
 import com.worldbarometer.app.core.Tone
+import com.worldbarometer.app.core.findSignificantPeak
+import com.worldbarometer.app.core.hoursAgo
+import com.worldbarometer.app.data.model.ScoreHistoryPoint
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
 import kotlinx.coroutines.flow.scan
 import java.util.Locale
 
-/** Wysokość cyfry score; mini sparkline w prawym górnym rogu (WB-003). */
 private val ScoreFontSize = 34.sp
-private val SparklineWidth = 36.dp
-private val SparklineHeight = 24.dp
+private val WidgetPadding = 14.dp
+private val LabelReservedWidth = 88.dp
+private val TopRowGap = 8.dp
+private val SparklineMinWidth = 56.dp
+private val SparklineHeight = 44.dp
+private const val WIDGET_SPARKLINE_WIDTH_SCALE = 1.8f
+private const val WIDGET_SPARKLINE_SIZE_SCALE = 1.1f
+private val WidgetSparklineEndPadding = 6.dp
+private val WidgetMarkerDotSize = 10.dp
 
 /**
  * Widget pulpitu (Glance). Tło = gradient poziomu, tekst biały.
- * Mini sparkline (72h) w prawym górnym rogu. Tap = otwarcie aplikacji.
+ * WB-029: etykieta TL, sparkline TR (dynamiczna szerokość), marker szczytu na wykresie.
  */
 class BarometerWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = ServiceLocator.ensureInitialized(context)
         val settings = ServiceLocator.settingsStore
-        // Wartości startowe — pierwsza klatka bez „pustego" widgetu.
         val initialLensId = settings.currentLensId()
         val initialSnapshot = repository.currentSnapshot()
         provideContent {
-            // KLUCZOWE: dane czytane WEWNĄTRZ kompozycji (flow → collectAsState).
-            // Żywa sesja Glance przy update() tylko REKOMPONUJE — wartości złapane przed
-            // provideContent byłyby zamrożone do wygaśnięcia sesji (historyczna przyczyna
-            // „martwego" widgetu po zmianie kraju). Dzięki flow każda zmiana cache/lensu
-            // w DataStore sama przerysowuje żywą sesję; update() z workerów obsługuje
-            // wyłącznie restart sesji martwej.
-            // scan: zatrzymuje ostatni niepusty snapshot — przy zmianie kraju widget pokazuje
-            // stary kraj+dane aż nowy cache się pojawi, potem przełącza ATOMOWO (bez pustej
-            // klatki i bez etykiety nowego kraju nad danymi starego).
             val snapshot by repository.observe()
                 .scan(initialSnapshot) { previous, next -> next ?: previous }
                 .collectAsState(initial = initialSnapshot)
@@ -89,16 +96,30 @@ private fun WidgetContent(
     snapshot: BarometerRepository.Snapshot?,
     countryName: String,
 ) {
-    // Brak danych (stary cache / pierwsza klatka) -> Calm + NEUTRAL (WB-015 AC-1, T4).
     val level = snapshot?.level ?: Level.STABLE
     val tone = snapshot?.tone ?: Tone.NEUTRAL
     val scoreText = snapshot?.let { String.format(Locale.US, "%.1f", it.data.globalScore) } ?: "—"
     val summary = snapshot?.data?.shortSummary.orEmpty()
     val context = LocalContext.current
-    // Etykieta ze wspólnego słownika WB-014 (jedno źródło prawdy z dashboardem — AC-3).
     val levelLabel = context.getString(LevelPalette.labelRes(level, tone))
     val updatedText = snapshot?.let { "Updated ${RelativeTime.formatAbsolute(it.data.updatedAt)}" } ?: ""
     val white = ColorProvider(Color.White)
+
+    val history = snapshot?.data?.scoreHistory.orEmpty()
+    val currentScore = snapshot?.data?.globalScore ?: 0.0
+    val significantPeak = snapshot?.let { findSignificantPeak(history, currentScore) }
+    val showEventHeader = significantPeak != null && summary.isNotBlank()
+
+    val widgetSize = LocalSize.current
+    val contentWidth = widgetSize.width - WidgetPadding * 2
+    val baseSparklineWidth = (contentWidth - LabelReservedWidth - TopRowGap).coerceAtLeast(SparklineMinWidth)
+    val sparklineWidth = (baseSparklineWidth * WIDGET_SPARKLINE_WIDTH_SCALE * WIDGET_SPARKLINE_SIZE_SCALE)
+        .coerceAtMost(contentWidth * 0.92f)
+        .coerceAtLeast(SparklineMinWidth)
+    val sparklineHeight = SparklineHeight * WIDGET_SPARKLINE_SIZE_SCALE
+    val sparklineWidthPx = SparklineBitmap.dpToPx(context, sparklineWidth)
+    val sparklineHeightPx = SparklineBitmap.dpToPx(context, sparklineHeight)
+
     val widgetDescription = buildWidgetContentDescription(
         context = context,
         snapshot = snapshot,
@@ -108,6 +129,8 @@ private fun WidgetContent(
         tone = tone,
         countryName = countryName,
         updatedText = updatedText,
+        significantPeak = significantPeak,
+        updatedAt = snapshot?.data?.updatedAt,
     )
 
     Box(
@@ -116,13 +139,27 @@ private fun WidgetContent(
             .background(ImageProvider(backgroundFor(level, tone)))
             .semantics { contentDescription = widgetDescription }
             .clickable(actionStartActivity(Intent(context, MainActivity::class.java)))
-            .padding(14.dp),
+            .padding(WidgetPadding),
     ) {
-        Box(
-            modifier = GlanceModifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            TopLabelSparklineRow(
+                levelLabel = levelLabel,
+                snapshot = snapshot,
+                history = history,
+                updatedAt = snapshot?.data?.updatedAt,
+                sparklineWidth = sparklineWidth,
+                sparklineHeight = sparklineHeight,
+                sparklineWidthPx = sparklineWidthPx,
+                sparklineHeightPx = sparklineHeightPx,
+                peakIndex = significantPeak?.historyIndex,
+            )
+
+            Spacer(GlanceModifier.defaultWeight())
+
+            Column(
+                modifier = GlanceModifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Row(verticalAlignment = Alignment.Top) {
                     Text(
                         text = scoreText,
@@ -134,22 +171,55 @@ private fun WidgetContent(
                     )
                 }
 
-                Text(
-                    text = levelLabel,
-                    style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium),
-                )
+                if (showEventHeader) {
+                    Spacer(GlanceModifier.height(4.dp))
+                    Box(
+                        modifier = GlanceModifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val markerBitmap = remember {
+                                SignificantMarkerBitmap.render(context)
+                            }
+                            Image(
+                                provider = ImageProvider(markerBitmap),
+                                contentDescription = null,
+                                modifier = GlanceModifier.size(WidgetMarkerDotSize),
+                            )
+                            Spacer(GlanceModifier.width(4.dp))
+                            Text(
+                                text = context.getString(R.string.last_significant_event),
+                                style = TextStyle(color = white, fontSize = 10.sp),
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
 
                 if (summary.isNotBlank()) {
-                    Spacer(GlanceModifier.height(4.dp))
+                    Spacer(GlanceModifier.height(2.dp))
                     Text(
                         text = summary,
-                        style = TextStyle(color = white, fontSize = 11.sp),
+                        style = TextStyle(color = white, fontSize = 11.sp, textAlign = TextAlign.Center),
+                        modifier = GlanceModifier.fillMaxWidth(),
                         maxLines = 2,
                     )
                 }
+            }
 
+            Spacer(GlanceModifier.defaultWeight())
+
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (countryName.isNotBlank()) {
+                    CountryBadgeGlance(countryName = countryName)
+                } else {
+                    Spacer(GlanceModifier.width(1.dp))
+                }
+                Spacer(GlanceModifier.defaultWeight())
                 if (updatedText.isNotBlank()) {
-                    Spacer(GlanceModifier.height(8.dp))
                     Text(
                         text = updatedText,
                         style = TextStyle(color = white, fontSize = 10.sp),
@@ -158,32 +228,62 @@ private fun WidgetContent(
                 }
             }
         }
+    }
+}
 
-        if (countryName.isNotBlank()) {
-            Box(
-                modifier = GlanceModifier.fillMaxSize(),
-                contentAlignment = Alignment.BottomStart,
-            ) {
-                CountryBadgeGlance(countryName = countryName)
-            }
-        }
+@Composable
+private fun TopLabelSparklineRow(
+    levelLabel: String,
+    snapshot: BarometerRepository.Snapshot?,
+    history: List<ScoreHistoryPoint>,
+    updatedAt: String?,
+    sparklineWidth: Dp,
+    sparklineHeight: Dp,
+    sparklineWidthPx: Int,
+    sparklineHeightPx: Int,
+    peakIndex: Int?,
+) {
+    val context = LocalContext.current
+    val white = ColorProvider(Color.White)
 
-        if (snapshot != null) {
-            val sparklineBitmap = remember(snapshot.data.scoreHistory, snapshot.data.updatedAt) {
-                SparklineBitmap.render(
-                    context = context,
-                    history = snapshot.data.scoreHistory,
-                    updatedAt = snapshot.data.updatedAt,
-                )
-            }
-            Box(
-                modifier = GlanceModifier.fillMaxSize(),
-                contentAlignment = Alignment.TopEnd,
-            ) {
+    Row(
+        modifier = GlanceModifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = levelLabel,
+            style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+            modifier = GlanceModifier.width(LabelReservedWidth),
+            maxLines = 1,
+        )
+        Spacer(GlanceModifier.width(TopRowGap))
+        Box(
+            modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            if (snapshot != null && history.isNotEmpty()) {
+                val sparklineBitmap = remember(
+                    history,
+                    updatedAt,
+                    sparklineWidthPx,
+                    sparklineHeightPx,
+                    peakIndex,
+                ) {
+                    SparklineBitmap.render(
+                        context = context,
+                        history = history,
+                        updatedAt = updatedAt,
+                        widthPx = sparklineWidthPx,
+                        heightPx = sparklineHeightPx,
+                        peakIndex = peakIndex,
+                    )
+                }
                 Image(
                     provider = ImageProvider(sparklineBitmap),
                     contentDescription = null,
-                    modifier = GlanceModifier.size(SparklineWidth, SparklineHeight),
+                    modifier = GlanceModifier
+                        .size(sparklineWidth, sparklineHeight)
+                        .padding(end = WidgetSparklineEndPadding),
                 )
             }
         }
@@ -218,24 +318,32 @@ private fun buildWidgetContentDescription(
     tone: Tone,
     countryName: String,
     updatedText: String,
+    significantPeak: SignificantPeak?,
+    updatedAt: String?,
 ): String {
     if (snapshot == null) return "World Barometer"
     val updatedPart = updatedText.removePrefix("Updated ").lowercase(Locale.US)
-    // Ton dokładany tylko w pasmach sygnału (score >= 5) — WB-015 §4.4, spójnie z WB-014 §4.6.
     val tonePart = if (level.isCalmBand) {
         ""
     } else {
         " — ${context.getString(LevelPalette.tonePhraseRes(tone))}"
     }
-    return "World Barometer $scoreText ${levelLabel.lowercase(Locale.US)}$tonePart, " +
-        "trend ${snapshot.trend.name.lowercase(Locale.US)} over the last 72 hours, " +
-        "for $countryName, updated $updatedPart"
+    val peakPart = significantPeak?.let { peak ->
+        val windowEnd = Sparkline.windowEnd(snapshot.data.scoreHistory, updatedAt)
+        val hours = hoursAgo(peak.timestamp, windowEnd)
+        val peakScore = String.format(Locale.US, "%.1f", peak.score)
+        context.getString(R.string.significant_peak_description, hours, peakScore)
+    }
+    return buildString {
+        append(
+            "World Barometer $scoreText ${levelLabel.lowercase(Locale.US)}$tonePart, " +
+                "trend ${snapshot.trend.name.lowercase(Locale.US)} over the last 48 hours, " +
+                "for $countryName, updated $updatedPart",
+        )
+        if (peakPart != null) append(" $peakPart")
+    }
 }
 
-/**
- * Tło z pary (pasmo score x ton) — macierz WB-015 §4.1: 2 tła spokoju (bez tonowania)
- * + 3 pasma sygnału x 3 tony. Negative = dotychczasowe gradienty sygnałowe.
- */
 private fun backgroundFor(level: Level, tone: Tone): Int = when (level) {
     Level.STABLE -> R.drawable.widget_bg_calm
     Level.LOW -> R.drawable.widget_bg_quiet

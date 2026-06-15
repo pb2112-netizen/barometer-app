@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,8 +56,13 @@ import com.worldbarometer.app.core.BrandPalette
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
+import com.worldbarometer.app.core.SignificantMarkerDot
+import com.worldbarometer.app.core.Sparkline
+import com.worldbarometer.app.core.DASHBOARD_CHART_WIDTH_FRACTION
 import com.worldbarometer.app.core.SparklineChart
 import com.worldbarometer.app.core.Tone
+import com.worldbarometer.app.core.findSignificantPeak
+import com.worldbarometer.app.core.hoursAgo
 import com.worldbarometer.app.data.model.TopEvent
 import com.worldbarometer.app.data.repo.BarometerRepository
 import java.util.Locale
@@ -135,16 +141,32 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         val scoreText = String.format(Locale.US, "%.1f", data.globalScore)
-        val sparklineDescription = stringResource(
-            R.string.sparkline_content_description,
-            snapshot.trend.name.lowercase(Locale.US),
-            scoreText,
-        )
+        val significantPeak = findSignificantPeak(data.scoreHistory, data.globalScore)
+        val showEventHeader = data.shortSummary.isNotBlank() && significantPeak != null
+        val windowEnd = Sparkline.windowEnd(data.scoreHistory, data.updatedAt)
+        val peakDescription = significantPeak?.let { peak ->
+            stringResource(
+                R.string.significant_peak_description,
+                hoursAgo(peak.timestamp, windowEnd),
+                String.format(Locale.US, "%.1f", peak.score),
+            )
+        }
+        val sparklineDescription = buildString {
+            append(
+                stringResource(
+                    R.string.sparkline_content_description,
+                    snapshot.trend.name.lowercase(Locale.US),
+                    scoreText,
+                ),
+            )
+            if (peakDescription != null) append(" $peakDescription")
+        }
         val enablePulse = !state.isStale && !state.isOffline && data.scoreHistory.size >= 3
         // a11y (WB-014 §4.6): ton niesiony tekstem opisu — TalkBack nie polega na kolorze.
-        val scoreDescription = stringResource(
-            LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel,
-        )
+        val scoreDescription = buildString {
+            append(stringResource(LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel))
+            if (peakDescription != null) append(" $peakDescription")
+        }
         Row(verticalAlignment = Alignment.Top) {
             Text(
                 text = scoreText,
@@ -171,9 +193,11 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
             lastPointColor = levelColor,
             enablePulse = enablePulse,
             contentDescription = sparklineDescription,
+            peakIndex = significantPeak?.historyIndex,
+            modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
         )
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
@@ -190,11 +214,40 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         Spacer(Modifier.height(16.dp))
 
         if (data.shortSummary.isNotBlank()) {
-            Text(
-                text = data.shortSummary,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
+            if (showEventHeader) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SignificantMarkerDot(
+                            dotRadius = 3.dp,
+                            modifier = Modifier.padding(end = 6.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.last_significant_event),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = data.shortSummary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Text(
+                    text = data.shortSummary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Spacer(Modifier.height(8.dp))
         }
 

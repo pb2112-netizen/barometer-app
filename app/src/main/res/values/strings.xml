@@ -37,8 +37,10 @@
     <string name="tone_phrase_positive">positive development</string>
     <string name="tone_phrase_neutral">important, mixed signals</string>
 
-    <!-- WB-003: sparkline time anchors + a11y -->
-    <string name="sparkline_anchor_past">72h ago</string>
+    <!-- WB-003/WB-029: sparkline time anchors + a11y -->
+    <string name="sparkline_anchor_past">48h ago</string>
     <string name="sparkline_anchor_now">Now</string>
-    <string name="sparkline_content_description">Score trend over the last 72 hours: %1$s. Current score %2$s.</string>
+    <string name="sparkline_content_description">Score trend over the last 48 hours: %1$s. Current score %2$s.</string>
+    <string name="last_significant_event">Last significant event</string>
+    <string name="significant_peak_description">Last significant event peaked about %1$d hours ago at score %2$s.</string>
 </resources>
