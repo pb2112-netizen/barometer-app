@@ -68,6 +68,7 @@ fun BarometerData.sanitized(): BarometerData = copy(
     levelLabel = levelLabel?.sanitizeText(20),
     tone = tone?.sanitizeText(20),
     trend = trend?.sanitizeText(20),
+    eventsAnchorAt = eventsAnchorAt?.sanitizeText(40),
     // updated_at walidowane przy parsowaniu czasu (RelativeTime); tryb tylko do podglądu.
     tryb = tryb.sanitizeText(80),
 )

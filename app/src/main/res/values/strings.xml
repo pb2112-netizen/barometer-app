@@ -42,5 +42,5 @@
     <string name="sparkline_anchor_now">Now</string>
     <string name="sparkline_content_description">Score trend over the last 48 hours: %1$s. Current score %2$s.</string>
     <string name="last_significant_event">Last significant event</string>
-    <string name="significant_peak_description">Last significant event peaked about %1$d hours ago at score %2$s.</string>
+    <string name="significant_peak_description">Last significant event from about %1$d hours ago; score was %2$s then.</string>
 </resources>

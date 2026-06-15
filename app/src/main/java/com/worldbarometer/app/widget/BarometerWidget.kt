@@ -47,11 +47,11 @@ import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.core.SignificantMarkerBitmap
-import com.worldbarometer.app.core.SignificantPeak
+import com.worldbarometer.app.core.EventsAnchor
+import com.worldbarometer.app.core.resolveVisibleEventsAnchor
 import com.worldbarometer.app.core.Sparkline
 import com.worldbarometer.app.core.SparklineBitmap
 import com.worldbarometer.app.core.Tone
-import com.worldbarometer.app.core.findSignificantPeak
 import com.worldbarometer.app.core.hoursAgo
 import com.worldbarometer.app.data.model.ScoreHistoryPoint
 import com.worldbarometer.app.data.repo.BarometerRepository
@@ -72,7 +72,7 @@ private val WidgetMarkerDotSize = 10.dp
 
 /**
  * Widget pulpitu (Glance). Tło = gradient poziomu, tekst biały.
- * WB-029: etykieta TL, sparkline TR (dynamiczna szerokość), marker szczytu na wykresie.
+ * WB-029/WB-030: etykieta TL, sparkline TR (dynamiczna szerokość), marker kotwicy wydarzeń na wykresie.
  */
 class BarometerWidget : GlanceAppWidget() {
 
@@ -106,9 +106,15 @@ private fun WidgetContent(
     val white = ColorProvider(Color.White)
 
     val history = snapshot?.data?.scoreHistory.orEmpty()
-    val currentScore = snapshot?.data?.globalScore ?: 0.0
-    val significantPeak = snapshot?.let { findSignificantPeak(history, currentScore) }
-    val showEventHeader = significantPeak != null && summary.isNotBlank()
+    val eventsAnchor = snapshot?.let {
+        resolveVisibleEventsAnchor(
+            history = history,
+            eventsAnchorAt = it.data.eventsAnchorAt,
+            topEvents = it.data.topEvents,
+            shortSummary = summary,
+        )
+    }
+    val showEventHeader = eventsAnchor != null
 
     val widgetSize = LocalSize.current
     val contentWidth = widgetSize.width - WidgetPadding * 2
@@ -129,7 +135,7 @@ private fun WidgetContent(
         tone = tone,
         countryName = countryName,
         updatedText = updatedText,
-        significantPeak = significantPeak,
+        eventsAnchor = eventsAnchor,
         updatedAt = snapshot?.data?.updatedAt,
     )
 
@@ -151,7 +157,7 @@ private fun WidgetContent(
                 sparklineHeight = sparklineHeight,
                 sparklineWidthPx = sparklineWidthPx,
                 sparklineHeightPx = sparklineHeightPx,
-                peakIndex = significantPeak?.historyIndex,
+                peakIndex = eventsAnchor?.historyIndex,
             )
 
             Spacer(GlanceModifier.defaultWeight())
@@ -318,7 +324,7 @@ private fun buildWidgetContentDescription(
     tone: Tone,
     countryName: String,
     updatedText: String,
-    significantPeak: SignificantPeak?,
+    eventsAnchor: EventsAnchor?,
     updatedAt: String?,
 ): String {
     if (snapshot == null) return "World Barometer"
@@ -328,11 +334,11 @@ private fun buildWidgetContentDescription(
     } else {
         " — ${context.getString(LevelPalette.tonePhraseRes(tone))}"
     }
-    val peakPart = significantPeak?.let { peak ->
+    val anchorPart = eventsAnchor?.let { anchor ->
         val windowEnd = Sparkline.windowEnd(snapshot.data.scoreHistory, updatedAt)
-        val hours = hoursAgo(peak.timestamp, windowEnd)
-        val peakScore = String.format(Locale.US, "%.1f", peak.score)
-        context.getString(R.string.significant_peak_description, hours, peakScore)
+        val hours = hoursAgo(anchor.timestamp, windowEnd)
+        val anchorScore = String.format(Locale.US, "%.1f", anchor.score)
+        context.getString(R.string.significant_peak_description, hours, anchorScore)
     }
     return buildString {
         append(
@@ -340,7 +346,7 @@ private fun buildWidgetContentDescription(
                 "trend ${snapshot.trend.name.lowercase(Locale.US)} over the last 48 hours, " +
                 "for $countryName, updated $updatedPart",
         )
-        if (peakPart != null) append(" $peakPart")
+        if (anchorPart != null) append(" $anchorPart")
     }
 }
 

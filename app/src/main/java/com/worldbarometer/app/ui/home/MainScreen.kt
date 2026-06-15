@@ -61,7 +61,7 @@ import com.worldbarometer.app.core.Sparkline
 import com.worldbarometer.app.core.DASHBOARD_CHART_WIDTH_FRACTION
 import com.worldbarometer.app.core.SparklineChart
 import com.worldbarometer.app.core.Tone
-import com.worldbarometer.app.core.findSignificantPeak
+import com.worldbarometer.app.core.resolveVisibleEventsAnchor
 import com.worldbarometer.app.core.hoursAgo
 import com.worldbarometer.app.data.model.TopEvent
 import com.worldbarometer.app.data.repo.BarometerRepository
@@ -141,14 +141,19 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         val scoreText = String.format(Locale.US, "%.1f", data.globalScore)
-        val significantPeak = findSignificantPeak(data.scoreHistory, data.globalScore)
-        val showEventHeader = data.shortSummary.isNotBlank() && significantPeak != null
+        val eventsAnchor = resolveVisibleEventsAnchor(
+            history = data.scoreHistory,
+            eventsAnchorAt = data.eventsAnchorAt,
+            topEvents = data.topEvents,
+            shortSummary = data.shortSummary,
+        )
+        val showEventHeader = eventsAnchor != null
         val windowEnd = Sparkline.windowEnd(data.scoreHistory, data.updatedAt)
-        val peakDescription = significantPeak?.let { peak ->
+        val anchorDescription = eventsAnchor?.let { anchor ->
             stringResource(
                 R.string.significant_peak_description,
-                hoursAgo(peak.timestamp, windowEnd),
-                String.format(Locale.US, "%.1f", peak.score),
+                hoursAgo(anchor.timestamp, windowEnd),
+                String.format(Locale.US, "%.1f", anchor.score),
             )
         }
         val sparklineDescription = buildString {
@@ -159,13 +164,13 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                     scoreText,
                 ),
             )
-            if (peakDescription != null) append(" $peakDescription")
+            if (anchorDescription != null) append(" $anchorDescription")
         }
         val enablePulse = !state.isStale && !state.isOffline && data.scoreHistory.size >= 3
         // a11y (WB-014 §4.6): ton niesiony tekstem opisu — TalkBack nie polega na kolorze.
         val scoreDescription = buildString {
             append(stringResource(LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel))
-            if (peakDescription != null) append(" $peakDescription")
+            if (anchorDescription != null) append(" $anchorDescription")
         }
         Row(verticalAlignment = Alignment.Top) {
             Text(
@@ -193,7 +198,7 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
             lastPointColor = levelColor,
             enablePulse = enablePulse,
             contentDescription = sparklineDescription,
-            peakIndex = significantPeak?.historyIndex,
+            peakIndex = eventsAnchor?.historyIndex,
             modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
         )
         Row(

@@ -32,12 +32,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.worldbarometer.app.data.model.ScoreHistoryPoint
+import com.worldbarometer.app.data.model.TopEvent
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Amber marker for last significant peak (WB-029). */
+/** Amber marker for events anchor on sparkline (WB-029/WB-030). */
 val SignificantMarkerColor = Color(0xFFEAB308)
 
 /** Static halo matching pulsing “now” marker at peak alpha (0.85 × 0.45). */
@@ -79,11 +80,61 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMarkerWithHalo(
     drawCircle(color = color, radius = pointRadius, center = center)
 }
 
-data class SignificantPeak(
+data class EventsAnchor(
     val historyIndex: Int,
     val score: Double,
     val timestamp: String,
 )
+
+private const val QUIET_NEWS_CYCLE = "Quiet news cycle"
+
+/** WB-030: last history point at or before events_anchor_at from JSON. */
+fun findEventsAnchor(
+    history: List<ScoreHistoryPoint>,
+    eventsAnchorAt: String?,
+): EventsAnchor? {
+    if (eventsAnchorAt.isNullOrBlank()) return null
+    if (history.size < 2) return null
+
+    val anchorInstant = Sparkline.parseInstant(eventsAnchorAt) ?: return null
+    var bestIndex: Int? = null
+    var bestInstant: Instant? = null
+
+    history.forEachIndexed { index, point ->
+        val pointInstant = Sparkline.parseInstant(point.timestamp) ?: return@forEachIndexed
+        if (!pointInstant.isAfter(anchorInstant)) {
+            if (bestInstant == null || pointInstant.isAfter(bestInstant)) {
+                bestInstant = pointInstant
+                bestIndex = index
+            }
+        }
+    }
+
+    return bestIndex?.let { index ->
+        EventsAnchor(
+            historyIndex = index,
+            score = history[index].score,
+            timestamp = history[index].timestamp,
+        )
+    }
+}
+
+/** WB-030: marker + header only when anchor is in the past (not current cycle). */
+fun resolveVisibleEventsAnchor(
+    history: List<ScoreHistoryPoint>,
+    eventsAnchorAt: String?,
+    topEvents: List<TopEvent>,
+    shortSummary: String,
+): EventsAnchor? {
+    if (eventsAnchorAt.isNullOrBlank()) return null
+    if (shortSummary.isBlank()) return null
+    if (topEvents.isEmpty()) return null
+    if (shortSummary.trim().equals(QUIET_NEWS_CYCLE, ignoreCase = true)) return null
+
+    val anchor = findEventsAnchor(history, eventsAnchorAt) ?: return null
+    if (anchor.historyIndex >= history.lastIndex) return null
+    return anchor
+}
 
 /** Wspólna logika sparkline (WB-003/WB-029): stała skala Y 1–10, okno czasu 48 h. */
 object Sparkline {
@@ -227,34 +278,9 @@ private fun buildAndroidSmoothPath(points: List<Sparkline.PlotPoint>, plotLeft: 
     return path
 }
 
-fun findSignificantPeak(
-    history: List<ScoreHistoryPoint>,
-    currentScore: Double,
-    signalThreshold: Double = 5.0,
-): SignificantPeak? {
-    if (history.size < 3) return null
-
-    val localMaxima = history.indices.filter { index ->
-        val score = history[index].score
-        val leftOk = index == 0 || score >= history[index - 1].score
-        val rightOk = index == history.lastIndex || score >= history[index + 1].score
-        leftOk && rightOk
-    }
-
-    val peakIndex = localMaxima.lastOrNull { history[it].score >= signalThreshold } ?: return null
-    val peakScore = history[peakIndex].score
-    if (currentScore >= peakScore - 0.05) return null
-
-    return SignificantPeak(
-        historyIndex = peakIndex,
-        score = peakScore,
-        timestamp = history[peakIndex].timestamp,
-    )
-}
-
-fun hoursAgo(peakTimestamp: String, windowEnd: Instant): Int {
-    val peak = Sparkline.parseInstant(peakTimestamp) ?: return 0
-    return Duration.between(peak, windowEnd).toHours().toInt().coerceAtLeast(0)
+fun hoursAgo(anchorTimestamp: String, windowEnd: Instant): Int {
+    val anchor = Sparkline.parseInstant(anchorTimestamp) ?: return 0
+    return Duration.between(anchor, windowEnd).toHours().toInt().coerceAtLeast(0)
 }
 
 @Composable

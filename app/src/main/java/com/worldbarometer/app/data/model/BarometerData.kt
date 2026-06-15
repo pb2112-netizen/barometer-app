@@ -25,6 +25,8 @@ data class BarometerData(
     @SerialName("lens_name_en") val lensNameEn: String? = null,
     /** WB-003/WB-029: rolling 48h history of global_score (sorted ascending by t). */
     @SerialName("score_history") val scoreHistory: List<ScoreHistoryPoint> = emptyList(),
+    /** WB-030: ISO UTC when current top_events story first entered history. */
+    @SerialName("events_anchor_at") val eventsAnchorAt: String? = null,
 )
 
 @Serializable
