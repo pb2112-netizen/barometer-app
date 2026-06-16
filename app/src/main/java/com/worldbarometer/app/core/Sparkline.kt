@@ -188,6 +188,19 @@ object Sparkline {
         return plotPointAt(history[historyIndex], windowEnd, plotWidth, plotHeight)
     }
 
+    /** WB-031: X from anchor time; Y on X-axis (not score line). */
+    fun plotAxisMarkerAtIndex(
+        history: List<ScoreHistoryPoint>,
+        historyIndex: Int,
+        windowEnd: Instant,
+        plotWidth: Float,
+        plotHeight: Float,
+    ): PlotPoint? {
+        if (historyIndex !in history.indices) return null
+        val point = plotPointAt(history[historyIndex], windowEnd, plotWidth, plotHeight) ?: return null
+        return PlotPoint(x = point.x, y = plotHeight)
+    }
+
     fun scoreToPlotY(score: Double, plotHeight: Float): Float {
         val bottomInset = plotHeight * Y_BOTTOM_INSET_RATIO
         val topInset = plotHeight * Y_TOP_INSET_RATIO
@@ -343,8 +356,8 @@ fun SparklineChart(
         )
 
         peakIndex?.let { index ->
-            Sparkline.plotPointAtIndex(history, index, end, plotWidth, plotHeight)?.let { peak ->
-                val center = Offset(plotLeft + peak.x, peak.y)
+            Sparkline.plotAxisMarkerAtIndex(history, index, end, plotWidth, plotHeight)?.let { peak ->
+                val center = Offset(plotLeft + peak.x, plotBottom - pointRadius)
                 drawMarkerWithHalo(center, pointRadius, style.peakMarkerColor)
             }
         }
@@ -450,9 +463,9 @@ object SparklineBitmap {
             style = Paint.Style.FILL
         }
         peakIndex?.let { index ->
-            Sparkline.plotPointAtIndex(history, index, end, plotWidth, plotHeight)?.let { peak ->
+            Sparkline.plotAxisMarkerAtIndex(history, index, end, plotWidth, plotHeight)?.let { peak ->
                 val px = plotLeft + peak.x
-                val py = peak.y
+                val py = plotBottom - pointRadius
                 val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = peakMarkerColor.copy(alpha = MARKER_HALO_ALPHA).toArgb()
                     style = Paint.Style.FILL
