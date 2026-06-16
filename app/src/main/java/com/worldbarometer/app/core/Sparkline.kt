@@ -357,7 +357,7 @@ fun SparklineChart(
 
         peakIndex?.let { index ->
             Sparkline.plotAxisMarkerAtIndex(history, index, end, plotWidth, plotHeight)?.let { peak ->
-                val center = Offset(plotLeft + peak.x, plotBottom - pointRadius)
+                val center = Offset(plotLeft + peak.x, plotBottom)
                 drawMarkerWithHalo(center, pointRadius, style.peakMarkerColor)
             }
         }
@@ -465,7 +465,7 @@ object SparklineBitmap {
         peakIndex?.let { index ->
             Sparkline.plotAxisMarkerAtIndex(history, index, end, plotWidth, plotHeight)?.let { peak ->
                 val px = plotLeft + peak.x
-                val py = plotBottom - pointRadius
+                val py = plotBottom
                 val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = peakMarkerColor.copy(alpha = MARKER_HALO_ALPHA).toArgb()
                     style = Paint.Style.FILL
