@@ -56,6 +56,7 @@ import com.worldbarometer.app.core.BrandPalette
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
+import com.worldbarometer.app.core.ShortSummaryRules
 import com.worldbarometer.app.core.SignificantMarkerDot
 import com.worldbarometer.app.core.Sparkline
 import com.worldbarometer.app.core.DASHBOARD_CHART_WIDTH_FRACTION
@@ -218,7 +219,7 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         }
         Spacer(Modifier.height(16.dp))
 
-        if (data.shortSummary.isNotBlank()) {
+        if (ShortSummaryRules.isDisplayableShortSummary(data.shortSummary)) {
             if (showEventHeader) {
                 Box(
                     modifier = Modifier.fillMaxWidth(),

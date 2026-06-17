@@ -86,8 +86,6 @@ data class EventsAnchor(
     val timestamp: String,
 )
 
-private const val QUIET_NEWS_CYCLE = "Quiet news cycle"
-
 /** WB-030: last history point at or before events_anchor_at from JSON. */
 fun findEventsAnchor(
     history: List<ScoreHistoryPoint>,
@@ -127,9 +125,8 @@ fun resolveVisibleEventsAnchor(
     shortSummary: String,
 ): EventsAnchor? {
     if (eventsAnchorAt.isNullOrBlank()) return null
-    if (shortSummary.isBlank()) return null
     if (topEvents.isEmpty()) return null
-    if (shortSummary.trim().equals(QUIET_NEWS_CYCLE, ignoreCase = true)) return null
+    if (!ShortSummaryRules.isDisplayableShortSummary(shortSummary)) return null
 
     val anchor = findEventsAnchor(history, eventsAnchorAt) ?: return null
     if (anchor.historyIndex >= history.lastIndex) return null

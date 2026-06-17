@@ -46,6 +46,7 @@ import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
+import com.worldbarometer.app.core.ShortSummaryRules
 import com.worldbarometer.app.core.SignificantMarkerBitmap
 import com.worldbarometer.app.core.EventsAnchor
 import com.worldbarometer.app.core.resolveVisibleEventsAnchor
@@ -114,6 +115,7 @@ private fun WidgetContent(
             shortSummary = summary,
         )
     }
+    val displayableSummary = ShortSummaryRules.isDisplayableShortSummary(summary)
     val showEventHeader = eventsAnchor != null
 
     val widgetSize = LocalSize.current
@@ -177,7 +179,7 @@ private fun WidgetContent(
                     )
                 }
 
-                if (showEventHeader) {
+                if (showEventHeader && displayableSummary) {
                     Spacer(GlanceModifier.height(4.dp))
                     Box(
                         modifier = GlanceModifier.fillMaxWidth(),
@@ -202,7 +204,7 @@ private fun WidgetContent(
                     }
                 }
 
-                if (summary.isNotBlank()) {
+                if (displayableSummary) {
                     Spacer(GlanceModifier.height(2.dp))
                     Text(
                         text = summary,
