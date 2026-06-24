@@ -69,6 +69,17 @@ fun LegalAboutScreen(onBack: () -> Unit) {
                 title = stringResource(R.string.legal_section_privacy_title),
                 body = stringResource(R.string.legal_section_privacy_body),
             )
+            val privacyCd = stringResource(R.string.legal_cd_open_privacy_policy)
+            Text(
+                text = stringResource(R.string.legal_privacy_online_copy),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .semantics { contentDescription = privacyCd }
+                    .clickable { openUrl(context, LegalLinks.PRIVACY_POLICY_URL) }
+                    .padding(top = 6.dp),
+            )
 
             LegalSection(
                 title = stringResource(R.string.legal_section_license_title),
