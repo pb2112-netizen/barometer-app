@@ -10,3 +10,9 @@
 local.properties
 /app/build/
 .kotlin/
+
+# Dokumentacja LOKALNA — tylko dysk PO; NIGDY commit/push (prywatność)
+02_HANDOVER.md
+CHANGELOG.md
+PROJECT.md
+README.md
