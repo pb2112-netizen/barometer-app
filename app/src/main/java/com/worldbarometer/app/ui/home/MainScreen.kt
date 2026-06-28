@@ -385,13 +385,11 @@ private fun EventCard(event: TopEvent) {
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Spacer(Modifier.height(2.dp))
-                        var hasClickableLink = false
                         event.sources.forEach { source ->
                             val matchedLink = event.sourceLinks.firstOrNull {
                                 it.name == source && it.url.isAllowedSourceUrl()
                             }
                             if (matchedLink != null) {
-                                hasClickableLink = true
                                 val readCd = stringResource(R.string.event_source_read_cd, source)
                                 Row(
                                     modifier = Modifier
@@ -424,14 +422,6 @@ private fun EventCard(event: TopEvent) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                        }
-                        if (hasClickableLink) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.event_sources_browser_hint),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                 }
