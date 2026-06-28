@@ -24,23 +24,22 @@ class RefreshWorker(
         val repository = ServiceLocator.ensureInitialized(applicationContext)
         val settings = ServiceLocator.settingsStore
         val lensChange = inputData.getBoolean(KEY_LENS_CHANGE, false)
-        Log.d(TAG, "doWork: start (lensChange=$lensChange)")
+        val triggerSource = RefreshCoordinator.TriggerSource.fromKey(
+            inputData.getString(KEY_TRIGGER_SOURCE)
+                ?: if (lensChange) RefreshCoordinator.TriggerSource.LENS.key else RefreshCoordinator.TriggerSource.PERIODIC.key,
+        )
+        Log.d(TAG, "doWork: start source=${triggerSource.key} lensChange=$lensChange")
 
         val result = repository.refresh()
-        Log.d(TAG, "doWork: refresh -> ${result::class.simpleName}")
+        Log.d(TAG, "doWork: refresh -> ${result::class.simpleName} source=${triggerSource.key}")
 
-        // update() PO pobraniu (cache jest już zapisany) — restartuje martwą sesję Glance,
-        // która od razu czyta świeży cache. Żywa sesja i tak przerysowała się sama po zapisie
-        // (treść reaktywna w provideGlance).
         when (result) {
             is BarometerRepository.RefreshResult.Success -> {
-                BarometerWidgetUpdater.requestUpdate(applicationContext)
+                RefreshCoordinator.onFetchSuccess(applicationContext, triggerSource)
                 evaluateNotification(settings, result.snapshot.data.globalScore, result.snapshot)
                 return Result.success()
             }
             is BarometerRepository.RefreshResult.Failure -> {
-                // Zmiana kraju offline: i tak odśwież widget (kraj + dane z cache, jeśli są) i nie ponawiaj.
-                // Cykl periodyczny w zwykłym biegu: retry z backoffem (SPEC_MVP §2).
                 return if (lensChange) {
                     BarometerWidgetUpdater.requestUpdate(applicationContext)
                     Result.success()
@@ -82,7 +81,6 @@ class RefreshWorker(
         if (config.notificationsEnabled && score >= config.threshold && isRising && cooldownPassed) {
             val sent = Notifier(applicationContext).notifyAlert(
                 score = score,
-                // Etykieta ze wspólnego słownika (pasmo x ton) — spójna z dashboardem/widgetem.
                 levelLabel = applicationContext.getString(
                     LevelPalette.labelRes(snapshot.level, snapshot.tone),
                 ),
@@ -97,10 +95,12 @@ class RefreshWorker(
     companion object {
         private const val TAG = "WB-Widget"
 
-        /** Limit częstotliwości powiadomień: 3 h. */
         const val NOTIFICATION_COOLDOWN_MS = 3L * 60L * 60L * 1000L
 
         /** true → ścieżka zmiany kraju: po pobraniu zawsze odśwież widget i nie ponawiaj przy błędzie. */
         const val KEY_LENS_CHANGE = "lens_change"
+
+        /** Źródło triggera: periodic | unlock | lens | app | manual (logcat WB-Widget). */
+        const val KEY_TRIGGER_SOURCE = "trigger_source"
     }
 }

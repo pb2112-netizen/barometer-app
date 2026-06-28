@@ -69,6 +69,13 @@ class SettingsStore(context: Context) {
         dataStore.edit { it[KEY_LAST_SEEN_SCORE] = score }
     }
 
+    suspend fun lastSuccessfulFetchMillis(): Long =
+        dataStore.data.first()[KEY_LAST_SUCCESSFUL_FETCH] ?: 0L
+
+    suspend fun recordLastSuccessfulFetchMillis(millis: Long) {
+        dataStore.edit { it[KEY_LAST_SUCCESSFUL_FETCH] = millis }
+    }
+
     companion object {
         const val DEFAULT_THRESHOLD = 5.0
         const val DEFAULT_NOTIFICATIONS_ENABLED = true
@@ -79,5 +86,6 @@ class SettingsStore(context: Context) {
         private val KEY_LENS_ID = stringPreferencesKey("lens_id")
         private val KEY_LAST_NOTIFICATION = longPreferencesKey("last_notification_millis")
         private val KEY_LAST_SEEN_SCORE = doublePreferencesKey("last_seen_score")
+        private val KEY_LAST_SUCCESSFUL_FETCH = longPreferencesKey("last_successful_fetch_millis")
     }
 }

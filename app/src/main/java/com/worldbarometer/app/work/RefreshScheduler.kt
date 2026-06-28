@@ -14,38 +14,44 @@ import androidx.work.workDataOf
 import java.util.concurrent.TimeUnit
 
 /**
- * Planowanie odświeżania (SPEC_MVP §2): cyklicznie, tylko gdy jest sieć
- * i bateria nie jest niska. Plus jednorazowe (one-off) dla tapu w widget / pull-to-refresh.
+ * Planowanie odświeżania (WB-045): cyklicznie ~co godzinę (flex 15 min), tylko sieć.
+ * Plus expedited one-off: zmiana kraju, odblokowanie telefonu.
  *
- * Interwał ~60 min — dopasowany do backendu (silnik liczy ~raz na godzinę, cron `17 * * * *`).
- * Częstsze budzenie nie ma sensu: i tak ten sam JSON (OkHttp ETag/304), a oszczędzamy baterię/transfer.
+ * Interwał ~60 min — dopasowany do backendu (silnik liczy ~raz na godzinę).
  */
 object RefreshScheduler {
 
     private const val PERIODIC_WORK = "barometer_periodic_refresh"
-    private const val ONE_OFF_WORK = "barometer_one_off_refresh"
     private const val LENS_CHANGE_WORK = "barometer_lens_change_refresh"
+    private const val UNLOCK_WORK = "barometer_unlock_refresh"
 
-    // ~co godzinę; zgodne z cyklem backendu (cron co godzinę).
     private const val REFRESH_INTERVAL_MINUTES = 60L
+    private const val FLEX_INTERVAL_MINUTES = 15L
 
-    private val constraints = Constraints.Builder()
+    private val periodicConstraints = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
-        .setRequiresBatteryNotLow(true)
         .build()
 
-    // Expedited dopuszcza tylko ograniczone constraints (sieć/storage) — bez battery-not-low.
+    // Expedited dopuszcza tylko ograniczone constraints (sieć/storage).
     private val expeditedConstraints = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
         .build()
 
     /**
-     * Wywoływane raz przy starcie aplikacji. UPDATE = przy aktualizacji appki podmień
-     * parametry istniejącego planu (np. nowy interwał) bez gubienia harmonogramu.
+     * Wywoływane przy starcie aplikacji i po BOOT_COMPLETED. UPDATE = podmień parametry
+     * istniejącego planu bez gubienia harmonogramu.
      */
     fun schedulePeriodic(context: Context) {
-        val request = PeriodicWorkRequestBuilder<RefreshWorker>(REFRESH_INTERVAL_MINUTES, TimeUnit.MINUTES)
-            .setConstraints(constraints)
+        val request = PeriodicWorkRequestBuilder<RefreshWorker>(
+            REFRESH_INTERVAL_MINUTES,
+            TimeUnit.MINUTES,
+            FLEX_INTERVAL_MINUTES,
+            TimeUnit.MINUTES,
+        )
+            .setConstraints(periodicConstraints)
+            .setInputData(
+                workDataOf(RefreshWorker.KEY_TRIGGER_SOURCE to RefreshCoordinator.TriggerSource.PERIODIC.key),
+            )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
 
@@ -58,16 +64,19 @@ object RefreshScheduler {
 
     /**
      * Zmiana kraju (lens). Expedited one-off uruchamia render + refresh widgetu w procesie
-     * WorkManagera, który PRZEŻYWA wyjście z aplikacji — inaczej One UI zamraża zwykłą korutynę
-     * w tle, zanim render Glance zdąży dojść (stąd „kraj odświeża się dopiero po cyklu silnika").
+     * WorkManagera, który PRZEŻYWA wyjście z aplikacji.
      * REPLACE: szybkie kolejne przełączenie kraju anuluje poprzednie zlecenie.
-     * RUN_AS_NON_EXPEDITED_WORK_REQUEST: przy wyczerpaniu limitu expedited zadziała jako zwykłe.
      */
     fun requestLensChangeRefresh(context: Context) {
         val request = OneTimeWorkRequestBuilder<RefreshWorker>()
             .setConstraints(expeditedConstraints)
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .setInputData(workDataOf(RefreshWorker.KEY_LENS_CHANGE to true))
+            .setInputData(
+                workDataOf(
+                    RefreshWorker.KEY_LENS_CHANGE to true,
+                    RefreshWorker.KEY_TRIGGER_SOURCE to RefreshCoordinator.TriggerSource.LENS.key,
+                ),
+            )
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
@@ -77,14 +86,21 @@ object RefreshScheduler {
         )
     }
 
-    /** Jednorazowe odświeżenie na żądanie (widget/tap). KEEP chroni przed spamem. */
-    fun requestOneOff(context: Context) {
+    /**
+     * Odblokowanie telefonu — backstop gdy periodic opóźniony przez Doze.
+     * KEEP: nie kasuj periodycznego harmonogramu.
+     */
+    fun requestUnlockRefresh(context: Context) {
         val request = OneTimeWorkRequestBuilder<RefreshWorker>()
-            .setConstraints(constraints)
+            .setConstraints(expeditedConstraints)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .setInputData(
+                workDataOf(RefreshWorker.KEY_TRIGGER_SOURCE to RefreshCoordinator.TriggerSource.UNLOCK.key),
+            )
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
-            ONE_OFF_WORK,
+            UNLOCK_WORK,
             ExistingWorkPolicy.KEEP,
             request,
         )

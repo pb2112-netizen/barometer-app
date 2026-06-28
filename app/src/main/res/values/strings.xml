@@ -45,4 +45,8 @@
     <string name="sparkline_content_description">Score trend over the last 48 hours: %1$s. Current score %2$s.</string>
     <string name="last_significant_event">Last significant event</string>
     <string name="significant_peak_description">Last significant event from about %1$d hours ago; score was %2$s then.</string>
+
+    <!-- WB-045: hint optymalizacji baterii dla niezawodnych aktualizacji widgetu -->
+    <string name="settings_widget_reliability_title">Reliable widget updates</string>
+    <string name="settings_widget_reliability_description">Baro refreshes your widget about once an hour. On some phones, battery optimization delays background updates. Tap to allow unrestricted background activity.</string>
 </resources>

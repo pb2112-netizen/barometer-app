@@ -1,5 +1,9 @@
 package com.worldbarometer.app.ui.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -11,6 +15,7 @@ import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
 import com.worldbarometer.app.widget.BarometerWidgetUpdater
+import com.worldbarometer.app.work.RefreshCoordinator
 import com.worldbarometer.app.work.RefreshScheduler
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -61,12 +66,38 @@ class SettingsViewModel(
             // pobranie i render widgetu poza korutyną UI. Zob. requestLensChangeRefresh.
             RefreshScheduler.requestLensChangeRefresh(ServiceLocator.applicationContext)
 
-            // Szybka ścieżka (foreground): pobierz nowy lens i wypchnij render od razu
-            // (requestUpdate renderuje bezpośrednio przez AppWidgetManager — bez sesji Glance).
-            repository.refresh()
-            BarometerWidgetUpdater.requestUpdate(ServiceLocator.applicationContext)
-            Log.d(TAG, "setLensId: foreground refresh+render done")
+            when (val result = repository.refresh()) {
+                is BarometerRepository.RefreshResult.Success -> {
+                    RefreshCoordinator.onFetchSuccess(
+                        ServiceLocator.applicationContext,
+                        RefreshCoordinator.TriggerSource.LENS,
+                    )
+                    Log.d(TAG, "setLensId: foreground refresh+render done")
+                }
+                is BarometerRepository.RefreshResult.Failure -> {
+                    BarometerWidgetUpdater.requestUpdate(ServiceLocator.applicationContext)
+                    Log.d(TAG, "setLensId: offline widget render")
+                }
+            }
         }
+    }
+
+    fun openBatteryOptimizationSettings() {
+        val context = ServiceLocator.applicationContext
+        val packageUri = Uri.parse("package:${context.packageName}")
+        val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = packageUri
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val listIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val intent = if (requestIntent.resolveActivity(context.packageManager) != null) {
+            requestIntent
+        } else {
+            listIntent
+        }
+        context.startActivity(intent)
     }
 
     companion object {

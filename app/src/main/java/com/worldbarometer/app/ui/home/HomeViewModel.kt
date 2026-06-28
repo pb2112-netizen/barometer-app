@@ -8,6 +8,7 @@ import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.data.local.SettingsStore
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
+import com.worldbarometer.app.work.RefreshCoordinator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,6 +73,14 @@ class HomeViewModel(
                 _uiState.update { it.copy(isRefreshing = false) }
             } else {
                 val result = repository.refresh()
+                if (result is BarometerRepository.RefreshResult.Success) {
+                    val source = if (manual) {
+                        RefreshCoordinator.TriggerSource.MANUAL
+                    } else {
+                        RefreshCoordinator.TriggerSource.APP
+                    }
+                    RefreshCoordinator.onFetchSuccess(ServiceLocator.applicationContext, source)
+                }
                 _uiState.update {
                     it.copy(
                         isRefreshing = false,
