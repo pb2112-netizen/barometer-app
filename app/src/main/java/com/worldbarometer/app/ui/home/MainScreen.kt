@@ -79,7 +79,7 @@ fun MainScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("World Barometer", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) },
                 actions = {
                     IconButton(onClick = { viewModel.refresh(manual = true) }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh")

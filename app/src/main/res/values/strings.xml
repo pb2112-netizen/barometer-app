@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">World Barometer</string>
+    <string name="app_name">Baro</string>
+    <string name="notification_alert_title_format">Baro: %1$s %2$.1f</string>
+    <string name="widget_content_description_format">%1$s %2$s %3$s%4$s, trend %5$s over the last 48 hours, for %6$s, updated %7$s</string>
     <string name="settings_country_lens_title">Country lens</string>
     <string name="settings_country_lens_description">Scores reflect how world events may affect daily life in the selected country. This is not your physical location — the app does not use GPS.</string>
     <string name="scoring_for_prefix">Scoring for:</string>

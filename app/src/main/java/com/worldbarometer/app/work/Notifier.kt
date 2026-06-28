@@ -13,7 +13,6 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.worldbarometer.app.MainActivity
 import com.worldbarometer.app.R
-import java.util.Locale
 
 /**
  * Lokalne powiadomienia (na telefonie). Aplikacja nie wysyła pushy z serwera —
@@ -74,7 +73,7 @@ class Notifier(context: Context) {
             android.app.PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val title = String.format(Locale.US, "World Barometer: %s %.1f", levelLabel, score)
+        val title = appContext.getString(R.string.notification_alert_title_format, levelLabel, score)
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_barometer)
             .setContentTitle(title)

@@ -329,7 +329,7 @@ private fun buildWidgetContentDescription(
     eventsAnchor: EventsAnchor?,
     updatedAt: String?,
 ): String {
-    if (snapshot == null) return "World Barometer"
+    if (snapshot == null) return context.getString(R.string.app_name)
     val updatedPart = updatedText.removePrefix("Updated ").lowercase(Locale.US)
     val tonePart = if (level.isCalmBand) {
         ""
@@ -344,9 +344,16 @@ private fun buildWidgetContentDescription(
     }
     return buildString {
         append(
-            "World Barometer $scoreText ${levelLabel.lowercase(Locale.US)}$tonePart, " +
-                "trend ${snapshot.trend.name.lowercase(Locale.US)} over the last 48 hours, " +
-                "for $countryName, updated $updatedPart",
+            context.getString(
+                R.string.widget_content_description_format,
+                context.getString(R.string.app_name),
+                scoreText,
+                levelLabel.lowercase(Locale.US),
+                tonePart,
+                snapshot.trend.name.lowercase(Locale.US),
+                countryName,
+                updatedPart,
+            ),
         )
         if (anchorPart != null) append(" $anchorPart")
     }
