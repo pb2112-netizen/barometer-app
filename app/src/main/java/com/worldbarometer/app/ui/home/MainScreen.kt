@@ -3,12 +3,14 @@ package com.worldbarometer.app.ui.home
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -64,6 +68,8 @@ import com.worldbarometer.app.core.SparklineChart
 import com.worldbarometer.app.core.Tone
 import com.worldbarometer.app.core.resolveVisibleEventsAnchor
 import com.worldbarometer.app.core.hoursAgo
+import com.worldbarometer.app.core.isAllowedSourceUrl
+import com.worldbarometer.app.core.openUrl
 import com.worldbarometer.app.data.model.TopEvent
 import com.worldbarometer.app.data.repo.BarometerRepository
 import java.util.Locale
@@ -339,6 +345,7 @@ private fun LevelPill(label: String, color: Color) {
 @Composable
 private fun EventCard(event: TopEvent) {
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Surface(
         modifier = Modifier
@@ -378,10 +385,51 @@ private fun EventCard(event: TopEvent) {
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Spacer(Modifier.height(2.dp))
+                        var hasClickableLink = false
                         event.sources.forEach { source ->
+                            val matchedLink = event.sourceLinks.firstOrNull {
+                                it.name == source && it.url.isAllowedSourceUrl()
+                            }
+                            if (matchedLink != null) {
+                                hasClickableLink = true
+                                val readCd = stringResource(R.string.event_source_read_cd, source)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .defaultMinSize(minHeight = 40.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                        ) { openUrl(context, matchedLink.url) }
+                                        .semantics { contentDescription = readCd },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        text = source,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Filled.OpenInNew,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = source,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (hasClickableLink) {
+                            Spacer(Modifier.height(4.dp))
                             Text(
-                                text = "• $source",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = stringResource(R.string.event_sources_browser_hint),
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

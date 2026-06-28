@@ -36,6 +36,12 @@ data class ScoreHistoryPoint(
 )
 
 @Serializable
+data class SourceLink(
+    val name: String = "",
+    val url: String = "",
+)
+
+@Serializable
 data class TopEvent(
     val title: String = "",
     val summary: String = "",
@@ -45,4 +51,6 @@ data class TopEvent(
     val nowosc: String? = null,
     val category: String? = null,
     val sources: List<String> = emptyList(),
+    /** WB-047: klikalne linki do artykułów wydawców (deterministycznie z RSS w silniku). */
+    @SerialName("source_links") val sourceLinks: List<SourceLink> = emptyList(),
 )

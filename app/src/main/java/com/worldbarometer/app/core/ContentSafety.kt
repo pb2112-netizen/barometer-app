@@ -2,6 +2,7 @@ package com.worldbarometer.app.core
 
 import com.worldbarometer.app.data.model.BarometerData
 import com.worldbarometer.app.data.model.ScoreHistoryPoint
+import com.worldbarometer.app.data.model.SourceLink
 import com.worldbarometer.app.data.model.TopEvent
 
 /**
@@ -19,6 +20,8 @@ private const val MAX_EVENT_SUMMARY = 600
 private const val MAX_RATIONALE = 1500
 private const val MAX_SOURCE = 40
 private const val MAX_SOURCES = 8
+private const val MAX_SOURCE_LINKS = 3
+private const val MAX_URL = 2048
 private const val MAX_EVENTS = 3
 private const val MAX_HISTORY_POINTS = 72
 
@@ -41,6 +44,13 @@ private fun String.sanitizeText(maxLength: Int): String {
 private fun Double.clampScore(): Double =
     if (isNaN() || isInfinite()) 1.0 else coerceIn(1.0, 10.0)
 
+private fun SourceLink.sanitized(): SourceLink? {
+    val cleanName = name.sanitizeText(MAX_SOURCE)
+    val cleanUrl = url.sanitizeText(MAX_URL)
+    if (cleanName.isBlank() || !cleanUrl.isAllowedSourceUrl()) return null
+    return SourceLink(name = cleanName, url = cleanUrl)
+}
+
 private fun TopEvent.sanitized(): TopEvent = copy(
     title = title.sanitizeText(MAX_TITLE),
     summary = summary.sanitizeText(MAX_EVENT_SUMMARY),
@@ -52,6 +62,11 @@ private fun TopEvent.sanitized(): TopEvent = copy(
         .map { it.sanitizeText(MAX_SOURCE) }
         .filter { it.isNotBlank() }
         .take(MAX_SOURCES)
+        .toList(),
+    sourceLinks = sourceLinks.asSequence()
+        .mapNotNull { it.sanitized() }
+        .distinctBy { it.url }
+        .take(MAX_SOURCE_LINKS)
         .toList(),
 )
 

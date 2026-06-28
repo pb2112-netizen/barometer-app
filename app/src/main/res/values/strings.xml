@@ -49,6 +49,10 @@
     <!-- WB-046: disclaimer AI nad Top events -->
     <string name="dashboard_ai_disclaimer">Scores and summaries are generated automatically by AI from public RSS headlines. For informational purposes only — not an official statement or advice. Content may contain errors.</string>
 
+    <!-- WB-047: linki do artykułów wydawców w rozwiniętej karcie Top event -->
+    <string name="event_sources_browser_hint">Opens in your browser</string>
+    <string name="event_source_read_cd">Read original article at %1$s, opens in browser</string>
+
     <!-- WB-045: hint optymalizacji baterii dla niezawodnych aktualizacji widgetu -->
     <string name="settings_widget_reliability_title">Reliable widget updates</string>
     <string name="settings_widget_reliability_description">Baro refreshes your widget about once an hour. On some phones, battery optimization delays background updates. Tap to allow unrestricted background activity.</string>
