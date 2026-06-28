@@ -412,9 +412,7 @@ private fun DisclaimerBox() {
         tonalElevation = 1.dp,
     ) {
         Text(
-            text = "Scores are generated automatically by AI from RSS headlines. " +
-                "For informational purposes only — not an official statement or advice. " +
-                "Content may contain errors.",
+            text = stringResource(R.string.dashboard_ai_disclaimer),
             modifier = Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
