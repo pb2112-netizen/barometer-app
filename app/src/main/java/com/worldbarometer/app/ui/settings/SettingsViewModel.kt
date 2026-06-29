@@ -1,9 +1,5 @@
 package com.worldbarometer.app.ui.settings
 
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -80,24 +76,6 @@ class SettingsViewModel(
                 }
             }
         }
-    }
-
-    fun openBatteryOptimizationSettings() {
-        val context = ServiceLocator.applicationContext
-        val packageUri = Uri.parse("package:${context.packageName}")
-        val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-            data = packageUri
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        val listIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        val intent = if (requestIntent.resolveActivity(context.packageManager) != null) {
-            requestIntent
-        } else {
-            listIntent
-        }
-        context.startActivity(intent)
     }
 
     companion object {

@@ -48,6 +48,7 @@ import android.content.Context
 import android.os.Build
 import android.os.PowerManager
 import com.worldbarometer.app.R
+import com.worldbarometer.app.core.BatteryOptimizationNavigator
 import com.worldbarometer.app.core.LensCatalog
 import java.util.Locale
 
@@ -186,7 +187,7 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(onClick = viewModel::openBatteryOptimizationSettings),
+                        .clickable { BatteryOptimizationNavigator.open(context) },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
