@@ -1,5 +1,6 @@
 package com.worldbarometer.app.ui.home
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -43,10 +44,16 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             repository.observe().collect { snapshot ->
+                val now = System.currentTimeMillis()
+                val isFreshSnapshot = snapshot?.isStale(now) == false
                 _uiState.update {
+                    if (isFreshSnapshot && it.isOffline) {
+                        Log.d(TAG, "offline=false (fresh snapshot recovered)")
+                    }
                     it.copy(
                         snapshot = snapshot,
-                        isStale = snapshot?.isStale(System.currentTimeMillis()) ?: false,
+                        isStale = snapshot?.isStale(now) ?: false,
+                        isOffline = if (isFreshSnapshot) false else it.isOffline,
                     )
                 }
             }
@@ -81,19 +88,31 @@ class HomeViewModel(
                     }
                     RefreshCoordinator.onFetchSuccess(ServiceLocator.applicationContext, source)
                 }
+                val shouldShowOffline = shouldShowOfflineAfterResult(result)
                 _uiState.update {
+                    if (shouldShowOffline && !it.isOffline) {
+                        Log.d(TAG, "offline=true (refresh failure with no fresh snapshot)")
+                    }
                     it.copy(
                         isRefreshing = false,
                         initialLoad = false,
-                        isOffline = result is BarometerRepository.RefreshResult.Failure,
+                        isOffline = shouldShowOffline,
                     )
                 }
             }
         }
     }
 
+    private fun shouldShowOfflineAfterResult(result: BarometerRepository.RefreshResult): Boolean {
+        if (result !is BarometerRepository.RefreshResult.Failure) return false
+        val now = System.currentTimeMillis()
+        val snapshot = _uiState.value.snapshot
+        return snapshot == null || snapshot.isStale(now)
+    }
+
     companion object {
         const val MANUAL_THROTTLE_MS = 60_000L
+        private const val TAG = "WB-Widget"
 
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
