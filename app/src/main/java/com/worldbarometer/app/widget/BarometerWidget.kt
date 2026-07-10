@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -19,6 +20,7 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -42,6 +44,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.worldbarometer.app.MainActivity
 import com.worldbarometer.app.R
+import com.worldbarometer.app.core.ANCHOR_MARKER_RADIUS_DP
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.LevelPalette
@@ -69,13 +72,25 @@ private val SparklineHeight = 44.dp
 private const val WIDGET_SPARKLINE_WIDTH_SCALE = 1.8f
 private const val WIDGET_SPARKLINE_SIZE_SCALE = 1.1f
 private val WidgetSparklineEndPadding = 6.dp
-private val WidgetMarkerDotSize = 10.dp
+
+// WB-055: marker size driven by shared ANCHOR_MARKER_RADIUS_DP (parity with dashboard)
+private val WidgetMarkerDotSize = (ANCHOR_MARKER_RADIUS_DP * 2 * 2.2f).dp   // dot + halo bounding box
+
+// WB-055: SizeMode.Responsive breakpoints
+private val SIZE_COMPACT = DpSize(130.dp, 100.dp)
+private val SIZE_STANDARD = DpSize(200.dp, 100.dp)
+private val SIZE_WIDE = DpSize(281.dp, 100.dp)
 
 /**
  * Widget pulpitu (Glance). Tło = gradient poziomu, tekst biały.
- * WB-029/WB-030: etykieta TL, sparkline TR (dynamiczna szerokość), marker kotwicy wydarzeń na wykresie.
+ * WB-029/WB-030: etykieta TL, sparkline TR, marker kotwicy wydarzeń.
+ * WB-055: SizeMode.Responsive (Compact/Standard/Wide), stale indicator, preview w pickerze.
  */
 class BarometerWidget : GlanceAppWidget() {
+
+    override val sizeMode = SizeMode.Responsive(
+        setOf(SIZE_COMPACT, SIZE_STANDARD, SIZE_WIDE)
+    )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = ServiceLocator.ensureInitialized(context)
@@ -106,6 +121,8 @@ private fun WidgetContent(
     val updatedText = snapshot?.let { "Updated ${RelativeTime.formatAbsolute(it.data.updatedAt)}" } ?: ""
     val white = ColorProvider(Color.White)
 
+    val isStale = snapshot?.isStale(System.currentTimeMillis()) ?: false
+
     val history = snapshot?.data?.scoreHistory.orEmpty()
     val eventsAnchor = snapshot?.let {
         resolveVisibleEventsAnchor(
@@ -117,6 +134,8 @@ private fun WidgetContent(
     }
     val displayableSummary = ShortSummaryRules.isDisplayableShortSummary(summary)
     val showEventHeader = eventsAnchor != null
+
+    val topEventTitle = snapshot?.data?.topEvents?.firstOrNull()?.title.orEmpty()
 
     val widgetSize = LocalSize.current
     val contentWidth = widgetSize.width - WidgetPadding * 2
@@ -139,7 +158,11 @@ private fun WidgetContent(
         updatedText = updatedText,
         eventsAnchor = eventsAnchor,
         updatedAt = snapshot?.data?.updatedAt,
+        isStale = isStale,
     )
+
+    // WB-055: dim overlay when stale (simulates alpha 0.75 on gradient)
+    val staleOverlayColor = ColorProvider(Color(0x40000000))
 
     Box(
         modifier = GlanceModifier
@@ -149,84 +172,112 @@ private fun WidgetContent(
             .clickable(actionStartActivity(Intent(context, MainActivity::class.java)))
             .padding(WidgetPadding),
     ) {
-        Column(modifier = GlanceModifier.fillMaxSize()) {
-            TopLabelSparklineRow(
+        // Stale dim overlay
+        if (isStale) {
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .background(staleOverlayColor),
+            ) {}
+        }
+
+        when {
+            widgetSize.width < 200.dp -> CompactWidgetContent(
+                scoreText = scoreText,
                 levelLabel = levelLabel,
+                updatedText = updatedText,
+                countryName = countryName,
+                isStale = isStale,
+                white = white,
+                context = context,
+            )
+            widgetSize.width > 280.dp -> WideWidgetContent(
+                scoreText = scoreText,
+                levelLabel = levelLabel,
+                updatedText = updatedText,
+                summary = summary,
+                countryName = countryName,
+                isStale = isStale,
+                showEventHeader = showEventHeader,
+                displayableSummary = displayableSummary,
+                topEventTitle = topEventTitle,
                 snapshot = snapshot,
                 history = history,
-                updatedAt = snapshot?.data?.updatedAt,
+                eventsAnchor = eventsAnchor,
                 sparklineWidth = sparklineWidth,
                 sparklineHeight = sparklineHeight,
                 sparklineWidthPx = sparklineWidthPx,
                 sparklineHeightPx = sparklineHeightPx,
-                peakIndex = eventsAnchor?.historyIndex,
+                white = white,
+                context = context,
             )
+            else -> StandardWidgetContent(
+                scoreText = scoreText,
+                levelLabel = levelLabel,
+                updatedText = updatedText,
+                summary = summary,
+                countryName = countryName,
+                isStale = isStale,
+                showEventHeader = showEventHeader,
+                displayableSummary = displayableSummary,
+                snapshot = snapshot,
+                history = history,
+                eventsAnchor = eventsAnchor,
+                sparklineWidth = sparklineWidth,
+                sparklineHeight = sparklineHeight,
+                sparklineWidthPx = sparklineWidthPx,
+                sparklineHeightPx = sparklineHeightPx,
+                white = white,
+                context = context,
+            )
+        }
+    }
+}
 
-            Spacer(GlanceModifier.defaultWeight())
+/** Wariant Compact: width < 200dp — score + level label + updated. Bez sparkline i summary. */
+@Composable
+private fun CompactWidgetContent(
+    scoreText: String,
+    levelLabel: String,
+    updatedText: String,
+    countryName: String,
+    isStale: Boolean,
+    white: ColorProvider,
+    context: Context,
+) {
+    Column(modifier = GlanceModifier.fillMaxSize()) {
+        Text(
+            text = levelLabel,
+            style = TextStyle(color = white, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+            maxLines = 1,
+        )
 
-            Column(
-                modifier = GlanceModifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Text(
-                        text = scoreText,
-                        style = TextStyle(color = white, fontSize = ScoreFontSize, fontWeight = FontWeight.Bold),
-                    )
-                    Text(
-                        text = "/10",
-                        style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium),
-                    )
-                }
+        Spacer(GlanceModifier.defaultWeight())
 
-                if (showEventHeader && displayableSummary) {
-                    Spacer(GlanceModifier.height(4.dp))
-                    Box(
-                        modifier = GlanceModifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val markerBitmap = remember {
-                                SignificantMarkerBitmap.render(context)
-                            }
-                            Image(
-                                provider = ImageProvider(markerBitmap),
-                                contentDescription = null,
-                                modifier = GlanceModifier.size(WidgetMarkerDotSize),
-                            )
-                            Spacer(GlanceModifier.width(4.dp))
-                            Text(
-                                text = context.getString(R.string.last_significant_event),
-                                style = TextStyle(color = white, fontSize = 10.sp),
-                                maxLines = 1,
-                            )
-                        }
-                    }
-                }
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                text = scoreText,
+                style = TextStyle(color = white, fontSize = ScoreFontSize, fontWeight = FontWeight.Bold),
+            )
+            Text(
+                text = "/10",
+                style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+            )
+        }
 
-                if (displayableSummary) {
-                    Spacer(GlanceModifier.height(2.dp))
-                    Text(
-                        text = summary,
-                        style = TextStyle(color = white, fontSize = 11.sp, textAlign = TextAlign.Center),
-                        modifier = GlanceModifier.fillMaxWidth(),
-                        maxLines = 2,
-                    )
-                }
+        Spacer(GlanceModifier.defaultWeight())
+
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (countryName.isNotBlank()) {
+                CountryBadgeGlance(countryName = countryName)
+            } else {
+                Spacer(GlanceModifier.width(1.dp))
             }
-
             Spacer(GlanceModifier.defaultWeight())
-
-            Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (countryName.isNotBlank()) {
-                    CountryBadgeGlance(countryName = countryName)
-                } else {
-                    Spacer(GlanceModifier.width(1.dp))
-                }
-                Spacer(GlanceModifier.defaultWeight())
+            Column(horizontalAlignment = Alignment.End) {
                 if (updatedText.isNotBlank()) {
                     Text(
                         text = updatedText,
@@ -234,6 +285,268 @@ private fun WidgetContent(
                         maxLines = 1,
                     )
                 }
+                if (isStale) {
+                    Text(
+                        text = context.getString(R.string.widget_stale_suffix),
+                        style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.7f)), fontSize = 10.sp),
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Wariant Standard: 200–280dp — dotychczasowy pełny layout. */
+@Composable
+private fun StandardWidgetContent(
+    scoreText: String,
+    levelLabel: String,
+    updatedText: String,
+    summary: String,
+    countryName: String,
+    isStale: Boolean,
+    showEventHeader: Boolean,
+    displayableSummary: Boolean,
+    snapshot: BarometerRepository.Snapshot?,
+    history: List<ScoreHistoryPoint>,
+    eventsAnchor: EventsAnchor?,
+    sparklineWidth: Dp,
+    sparklineHeight: Dp,
+    sparklineWidthPx: Int,
+    sparklineHeightPx: Int,
+    white: ColorProvider,
+    context: Context,
+) {
+    Column(modifier = GlanceModifier.fillMaxSize()) {
+        TopLabelSparklineRow(
+            levelLabel = levelLabel,
+            snapshot = snapshot,
+            history = history,
+            updatedAt = snapshot?.data?.updatedAt,
+            sparklineWidth = sparklineWidth,
+            sparklineHeight = sparklineHeight,
+            sparklineWidthPx = sparklineWidthPx,
+            sparklineHeightPx = sparklineHeightPx,
+            peakIndex = eventsAnchor?.historyIndex,
+        )
+
+        Spacer(GlanceModifier.defaultWeight())
+
+        Column(
+            modifier = GlanceModifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = scoreText,
+                    style = TextStyle(color = white, fontSize = ScoreFontSize, fontWeight = FontWeight.Bold),
+                )
+                Text(
+                    text = "/10",
+                    style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                )
+            }
+
+            if (showEventHeader && displayableSummary) {
+                Spacer(GlanceModifier.height(4.dp))
+                Box(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val markerBitmap = remember {
+                            SignificantMarkerBitmap.render(context)
+                        }
+                        Image(
+                            provider = ImageProvider(markerBitmap),
+                            contentDescription = null,
+                            modifier = GlanceModifier.size(WidgetMarkerDotSize),
+                        )
+                        Spacer(GlanceModifier.width(4.dp))
+                        Text(
+                            text = context.getString(R.string.last_significant_event),
+                            style = TextStyle(color = white, fontSize = 10.sp),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+
+            if (displayableSummary) {
+                Spacer(GlanceModifier.height(2.dp))
+                Text(
+                    text = summary,
+                    style = TextStyle(color = white, fontSize = 11.sp, textAlign = TextAlign.Center),
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    maxLines = 2,
+                )
+            }
+        }
+
+        Spacer(GlanceModifier.defaultWeight())
+
+        BottomRow(
+            countryName = countryName,
+            updatedText = updatedText,
+            isStale = isStale,
+            white = white,
+            context = context,
+        )
+    }
+}
+
+/** Wariant Wide: > 280dp — Standard + tytuł pierwszego top eventu (1 linia). */
+@Composable
+private fun WideWidgetContent(
+    scoreText: String,
+    levelLabel: String,
+    updatedText: String,
+    summary: String,
+    countryName: String,
+    isStale: Boolean,
+    showEventHeader: Boolean,
+    displayableSummary: Boolean,
+    topEventTitle: String,
+    snapshot: BarometerRepository.Snapshot?,
+    history: List<ScoreHistoryPoint>,
+    eventsAnchor: EventsAnchor?,
+    sparklineWidth: Dp,
+    sparklineHeight: Dp,
+    sparklineWidthPx: Int,
+    sparklineHeightPx: Int,
+    white: ColorProvider,
+    context: Context,
+) {
+    Column(modifier = GlanceModifier.fillMaxSize()) {
+        TopLabelSparklineRow(
+            levelLabel = levelLabel,
+            snapshot = snapshot,
+            history = history,
+            updatedAt = snapshot?.data?.updatedAt,
+            sparklineWidth = sparklineWidth,
+            sparklineHeight = sparklineHeight,
+            sparklineWidthPx = sparklineWidthPx,
+            sparklineHeightPx = sparklineHeightPx,
+            peakIndex = eventsAnchor?.historyIndex,
+        )
+
+        Spacer(GlanceModifier.defaultWeight())
+
+        Column(
+            modifier = GlanceModifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = scoreText,
+                    style = TextStyle(color = white, fontSize = ScoreFontSize, fontWeight = FontWeight.Bold),
+                )
+                Text(
+                    text = "/10",
+                    style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                )
+            }
+
+            if (showEventHeader && displayableSummary) {
+                Spacer(GlanceModifier.height(4.dp))
+                Box(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val markerBitmap = remember {
+                            SignificantMarkerBitmap.render(context)
+                        }
+                        Image(
+                            provider = ImageProvider(markerBitmap),
+                            contentDescription = null,
+                            modifier = GlanceModifier.size(WidgetMarkerDotSize),
+                        )
+                        Spacer(GlanceModifier.width(4.dp))
+                        Text(
+                            text = context.getString(R.string.last_significant_event),
+                            style = TextStyle(color = white, fontSize = 10.sp),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+
+            if (displayableSummary) {
+                Spacer(GlanceModifier.height(2.dp))
+                Text(
+                    text = summary,
+                    style = TextStyle(color = white, fontSize = 11.sp, textAlign = TextAlign.Center),
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    maxLines = 2,
+                )
+            }
+
+            // Wide-only: top event title
+            if (topEventTitle.isNotBlank()) {
+                Spacer(GlanceModifier.height(4.dp))
+                Text(
+                    text = topEventTitle,
+                    style = TextStyle(
+                        color = ColorProvider(Color.White.copy(alpha = 0.85f)),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center,
+                    ),
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    maxLines = 1,
+                )
+            }
+        }
+
+        Spacer(GlanceModifier.defaultWeight())
+
+        BottomRow(
+            countryName = countryName,
+            updatedText = updatedText,
+            isStale = isStale,
+            white = white,
+            context = context,
+        )
+    }
+}
+
+@Composable
+private fun BottomRow(
+    countryName: String,
+    updatedText: String,
+    isStale: Boolean,
+    white: ColorProvider,
+    context: Context,
+) {
+    Row(
+        modifier = GlanceModifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (countryName.isNotBlank()) {
+            CountryBadgeGlance(countryName = countryName)
+        } else {
+            Spacer(GlanceModifier.width(1.dp))
+        }
+        Spacer(GlanceModifier.defaultWeight())
+        Column(horizontalAlignment = Alignment.End) {
+            if (updatedText.isNotBlank()) {
+                Text(
+                    text = updatedText,
+                    style = TextStyle(color = white, fontSize = 10.sp),
+                    maxLines = 1,
+                )
+            }
+            // WB-055: stale indicator
+            if (isStale) {
+                Text(
+                    text = context.getString(R.string.widget_stale_suffix),
+                    style = TextStyle(
+                        color = ColorProvider(Color.White.copy(alpha = 0.7f)),
+                        fontSize = 10.sp,
+                    ),
+                    maxLines = 1,
+                )
             }
         }
     }
@@ -328,6 +641,7 @@ private fun buildWidgetContentDescription(
     updatedText: String,
     eventsAnchor: EventsAnchor?,
     updatedAt: String?,
+    isStale: Boolean,
 ): String {
     if (snapshot == null) return context.getString(R.string.app_name)
     val updatedPart = updatedText.removePrefix("Updated ").lowercase(Locale.US)
@@ -356,6 +670,8 @@ private fun buildWidgetContentDescription(
             ),
         )
         if (anchorPart != null) append(" $anchorPart")
+        // WB-055: stale a11y
+        if (isStale) append(" ${context.getString(R.string.widget_content_description_stale_suffix)}")
     }
 }
 
