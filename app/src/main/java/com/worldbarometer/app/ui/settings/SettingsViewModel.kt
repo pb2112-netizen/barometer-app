@@ -12,7 +12,6 @@ import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
 import com.worldbarometer.app.widget.BarometerWidgetUpdater
 import com.worldbarometer.app.work.RefreshCoordinator
-import com.worldbarometer.app.work.RefreshScheduler
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -24,7 +23,6 @@ data class SettingsUiState(
     val threshold: Double = SettingsStore.DEFAULT_THRESHOLD,
     val lensId: String = LensCatalog.DEFAULT_LENS_ID,
     val lastUpdatedText: String = "—",
-    val isChangingLens: Boolean = false,
 )
 
 class SettingsViewModel(
@@ -58,10 +56,8 @@ class SettingsViewModel(
             settingsStore.setLensId(id)
             Log.d(TAG, "setLensId: $current -> $id")
 
-            // Backstop: gdyby user wyszedł z apki od razu — WorkManager (expedited) dokończy
-            // pobranie i render widgetu poza korutyną UI. Zob. requestLensChangeRefresh.
-            RefreshScheduler.requestLensChangeRefresh(ServiceLocator.applicationContext)
-
+            // Foreground refresh: jeden request sieciowy + RefreshCoordinator synchronizuje widget.
+            // WM expedited usunięty — podwójny fetch z requestLensChangeRefresh (WB-054).
             when (val result = repository.refresh()) {
                 is BarometerRepository.RefreshResult.Success -> {
                     RefreshCoordinator.onFetchSuccess(

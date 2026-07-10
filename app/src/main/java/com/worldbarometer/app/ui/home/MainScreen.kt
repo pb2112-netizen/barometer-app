@@ -88,10 +88,10 @@ fun MainScreen(
                 title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) },
                 actions = {
                     IconButton(onClick = { viewModel.refresh(manual = true) }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.cd_refresh))
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.cd_settings))
                     }
                 },
             )
@@ -136,9 +136,9 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         if (state.isOffline || state.isStale) {
             StatusBanner(
                 text = if (state.isOffline) {
-                    "Offline — showing last known result"
+                    stringResource(R.string.offline_banner)
                 } else {
-                    "Data may be out of date"
+                    stringResource(R.string.stale_banner)
                 },
             )
             Spacer(Modifier.height(12.dp))
@@ -264,7 +264,7 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         }
 
         Text(
-            text = "Updated: ${RelativeTime.formatAbsolute(data.updatedAt)}",
+            text = stringResource(R.string.updated_at_format, RelativeTime.formatAbsolute(data.updatedAt)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -301,7 +301,7 @@ private fun EventsSection(events: List<TopEvent>) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "Top events (${events.size})",
+                text = stringResource(R.string.top_events_title, events.size),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -379,7 +379,7 @@ private fun EventCard(event: TopEvent) {
                     if (event.sources.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Sources",
+                            text = stringResource(R.string.sources_label),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -519,7 +519,7 @@ private fun EmptyState() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "No data yet. Pull down to refresh.",
+            text = stringResource(R.string.empty_state_pull_to_refresh),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

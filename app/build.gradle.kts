@@ -13,8 +13,8 @@ android {
         applicationId = "com.worldbarometer.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "0.9.4"
+        versionCode = 30
+        versionName = "0.9.5"
     }
 
     buildTypes {
@@ -71,4 +71,6 @@ dependencies {
     implementation(libs.androidx.glance)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
+
+    testImplementation(libs.junit)
 }

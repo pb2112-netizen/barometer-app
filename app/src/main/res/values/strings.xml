@@ -55,4 +55,19 @@
     <!-- WB-045: hint optymalizacji baterii dla niezawodnych aktualizacji widgetu -->
     <string name="settings_widget_reliability_title">Reliable widget updates</string>
     <string name="settings_widget_reliability_description">Baro refreshes your widget about once an hour. On some phones, battery optimization delays background updates. Tap to allow unrestricted background activity.</string>
+
+    <!-- WB-054: dashboard + notifications — no hardcoded UI literals in Kotlin -->
+    <string name="offline_banner">Offline — showing last known result</string>
+    <string name="stale_banner">Data may be out of date</string>
+    <string name="updated_at_format">Updated: %1$s</string>
+    <string name="top_events_title">Top events (%1$d)</string>
+    <string name="sources_label">Sources</string>
+    <string name="empty_state_pull_to_refresh">No data yet. Pull down to refresh.</string>
+    <string name="cd_refresh">Refresh</string>
+    <string name="cd_settings">Settings</string>
+    <string name="notification_channel_alerts">Barometer alerts</string>
+    <string name="notification_channel_alerts_description">Notifications when the threat level rises above your threshold.</string>
+    <string name="notification_channel_updates">Background updates</string>
+    <string name="notification_channel_updates_description">Brief, silent status while the widget refreshes in the background.</string>
+    <string name="notification_updating">Updating…</string>
 </resources>

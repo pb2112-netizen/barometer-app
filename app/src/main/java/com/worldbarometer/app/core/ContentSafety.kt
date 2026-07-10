@@ -79,7 +79,7 @@ fun BarometerData.sanitized(): BarometerData = copy(
         .map { it.sanitized() }
         .filter { it.timestamp.isNotBlank() }
         .sortedBy { it.timestamp }
-        .take(MAX_HISTORY_POINTS),
+        .takeLast(MAX_HISTORY_POINTS),
     levelLabel = levelLabel?.sanitizeText(20),
     tone = tone?.sanitizeText(20),
     trend = trend?.sanitizeText(20),

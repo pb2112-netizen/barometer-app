@@ -27,19 +27,19 @@ class Notifier(context: Context) {
             val manager = appContext.getSystemService(NotificationManager::class.java) ?: return
             val alerts = NotificationChannel(
                 CHANNEL_ID,
-                "Barometer alerts",
+                appContext.getString(R.string.notification_channel_alerts),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Notifications when the threat level rises above your threshold."
+                description = appContext.getString(R.string.notification_channel_alerts_description)
             }
             // Kanał MIN dla krótkiej pracy w tle (expedited WorkManager na API < 31
             // wymaga notyfikacji foreground; ma być cicha i nienachalna).
             val updates = NotificationChannel(
                 UPDATES_CHANNEL_ID,
-                "Background updates",
+                appContext.getString(R.string.notification_channel_updates),
                 NotificationManager.IMPORTANCE_MIN,
             ).apply {
-                description = "Brief, silent status while the widget refreshes in the background."
+                description = appContext.getString(R.string.notification_channel_updates_description)
             }
             manager.createNotificationChannel(alerts)
             manager.createNotificationChannel(updates)
@@ -54,7 +54,7 @@ class Notifier(context: Context) {
         ensureChannel()
         return NotificationCompat.Builder(appContext, UPDATES_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_barometer)
-            .setContentTitle("Updating…")
+            .setContentTitle(appContext.getString(R.string.notification_updating))
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setSilent(true)
             .setOngoing(true)
