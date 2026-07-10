@@ -45,8 +45,10 @@
     <string name="sparkline_content_description">Score trend over the last 48 hours: %1$s. Current score %2$s.</string>
     <string name="last_significant_event">Last significant event</string>
     <string name="significant_peak_description">Last significant event from about %1$d hours ago; score was %2$s then.</string>
+    <string name="sparkline_collecting_history">Collecting history — first chart in ~2h</string>
 
-    <!-- WB-046: disclaimer AI nad Top events -->
+    <!-- WB-046/WB-058: disclaimer AI pod Top events -->
+    <string name="dashboard_ai_disclaimer_icon">ⓘ</string>
     <string name="dashboard_ai_disclaimer">Scores and summaries are generated automatically by AI from public RSS headlines. For informational purposes only — not an official statement or advice. Content may contain errors.</string>
 
     <!-- WB-047: linki do artykułów wydawców w rozwiniętej karcie Top event -->
@@ -69,8 +71,15 @@
     <string name="top_events_title">Top events (%1$d)</string>
     <string name="sources_label">Sources</string>
     <string name="empty_state_pull_to_refresh">No data yet. Pull down to refresh.</string>
+    <string name="dashboard_loading">Loading dashboard</string>
     <string name="cd_refresh">Refresh</string>
     <string name="cd_settings">Settings</string>
+
+    <!-- WB-057: tap score → rationale bottom sheet -->
+    <string name="why_this_score_title">Why this score?</string>
+    <string name="why_this_score_cd">Why this score? Opens explanation</string>
+    <string name="tap_score_for_details">Tap score for details</string>
+    <string name="score_rationale_footer">AI-generated assessment</string>
     <string name="notification_channel_alerts">Barometer alerts</string>
     <string name="notification_channel_alerts_description">Notifications when the threat level rises above your threshold.</string>
     <string name="notification_channel_updates">Background updates</string>

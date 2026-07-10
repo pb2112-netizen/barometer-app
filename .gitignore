@@ -14,5 +14,6 @@ local.properties
 # Dokumentacja LOKALNA — tylko dysk PO; NIGDY commit/push (prywatność)
 02_HANDOVER.md
 CHANGELOG.md
+CHANGELOG_ARCHIVE.md
 PROJECT.md
 README.md

@@ -1,6 +1,9 @@
 package com.worldbarometer.app.ui.home
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,37 +30,47 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.worldbarometer.app.R
-import com.worldbarometer.app.core.BrandPalette
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
@@ -73,6 +87,10 @@ import com.worldbarometer.app.core.openUrl
 import com.worldbarometer.app.data.model.TopEvent
 import com.worldbarometer.app.data.repo.BarometerRepository
 import java.util.Locale
+
+private val HeroFontFamily = FontFamily(
+    Font(R.font.manrope_semibold, FontWeight.SemiBold),
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +134,7 @@ fun MainScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
     val snapshot = state.snapshot ?: return
@@ -179,105 +198,174 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
             append(stringResource(LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel))
             if (anchorDescription != null) append(" $anchorDescription")
         }
-        Row(verticalAlignment = Alignment.Top) {
-            Text(
-                text = scoreText,
-                color = levelColor,
-                fontSize = 92.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.semantics { contentDescription = scoreDescription },
-            )
-            Text(
-                text = "/10",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 2.dp),
+        var showRationaleSheet by remember { mutableStateOf(false) }
+        val rationaleAvailable = data.rationale.isNotBlank()
+        val whyScoreCd = stringResource(R.string.why_this_score_cd)
+        val scoreRowModifier = if (rationaleAvailable) {
+            Modifier
+                .clickable { showRationaleSheet = true }
+                .semantics {
+                    role = Role.Button
+                    contentDescription = "$scoreDescription. $whyScoreCd"
+                }
+        } else {
+            Modifier.semantics(mergeDescendants = true) {
+                contentDescription = scoreDescription
+            }
+        }
+        val heroShape = RoundedCornerShape(24.dp)
+        val heroBaseColor = MaterialTheme.colorScheme.surface
+        val isDarkTheme = isSystemInDarkTheme()
+        val heroGradient = remember(levelColor, heroBaseColor, isDarkTheme) {
+            val accentAlpha = if (isDarkTheme) 0.07f else 0.12f
+            val fadeAlpha = if (isDarkTheme) 0.02f else 0.035f
+            Brush.linearGradient(
+                colors = listOf(
+                    levelColor.copy(alpha = accentAlpha).compositeOver(heroBaseColor),
+                    levelColor.copy(alpha = fadeAlpha).compositeOver(heroBaseColor),
+                    heroBaseColor,
+                ),
             )
         }
 
-        LevelPill(label = levelLabel, color = levelColor)
-        Spacer(Modifier.height(12.dp))
-
-        SparklineChart(
-            history = data.scoreHistory,
-            updatedAt = data.updatedAt,
-            lastPointColor = levelColor,
-            enablePulse = enablePulse,
-            contentDescription = sparklineDescription,
-            peakIndex = eventsAnchor?.historyIndex,
-            modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
-            horizontalArrangement = Arrangement.SpaceBetween,
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(heroGradient, heroShape),
+            color = Color.Transparent,
+            shape = heroShape,
+            tonalElevation = 1.dp,
         ) {
-            Text(
-                text = stringResource(R.string.sparkline_anchor_past),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(R.string.sparkline_anchor_now),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-
-        if (ShortSummaryRules.isDisplayableShortSummary(data.shortSummary)) {
-            if (showEventHeader) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    modifier = scoreRowModifier,
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SignificantMarkerDot(
-                            dotRadius = 3.dp,
-                            modifier = Modifier.padding(end = 6.dp),
+                    Text(
+                        text = scoreText,
+                        color = levelColor,
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontFamily = HeroFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 92.sp,
+                            fontFeatureSettings = "tnum",
+                            letterSpacing = (-0.02).em,
+                        ),
+                    )
+                    Text(
+                        text = "/10",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFamily = HeroFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFeatureSettings = "tnum",
+                            letterSpacing = (-0.02).em,
+                        ),
+                        modifier = Modifier.padding(start = 2.dp),
+                    )
+                }
+
+                LevelPill(label = levelLabel, color = levelColor)
+                Text(
+                    text = stringResource(R.string.tap_score_for_details),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.alpha(0.6f),
+                )
+                Spacer(Modifier.height(12.dp))
+
+                if (data.scoreHistory.size >= 2) {
+                    SparklineChart(
+                        history = data.scoreHistory,
+                        updatedAt = data.updatedAt,
+                        lastPointColor = levelColor,
+                        enablePulse = enablePulse,
+                        contentDescription = sparklineDescription,
+                        peakIndex = eventsAnchor?.historyIndex,
+                        modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.sparkline_anchor_past),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = stringResource(R.string.last_significant_event),
+                            text = stringResource(R.string.sparkline_anchor_now),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION)
+                            .height(72.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.sparkline_collecting_history),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = data.shortSummary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                Text(
-                    text = data.shortSummary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Spacer(Modifier.height(16.dp))
+
+                if (ShortSummaryRules.isDisplayableShortSummary(data.shortSummary)) {
+                    if (showEventHeader) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SignificantMarkerDot(
+                                dotRadius = 3.dp,
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                            Text(
+                                text = stringResource(R.string.last_significant_event),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    Text(
+                        text = data.shortSummary,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
         }
+        Spacer(Modifier.height(12.dp))
+
+        if (showRationaleSheet) {
+            ScoreRationaleSheet(
+                rationale = data.rationale,
+                onDismiss = { showRationaleSheet = false },
+            )
+        }
+
+        if (data.topEvents.isNotEmpty()) {
+            EventsSection(events = data.topEvents)
+            Spacer(Modifier.height(16.dp))
+        }
+
+        DisclaimerBox()
+        Spacer(Modifier.height(12.dp))
 
         Text(
             text = stringResource(R.string.updated_at_format, RelativeTime.formatAbsolute(data.updatedAt)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-
-        Spacer(Modifier.height(20.dp))
-
-        DisclaimerBox()
-
-        Spacer(Modifier.height(20.dp))
-
-        if (data.topEvents.isNotEmpty()) {
-            EventsSection(events = data.topEvents)
-        }
 
         Spacer(Modifier.height(12.dp))
     }
@@ -323,6 +411,45 @@ private fun EventsSection(events: List<TopEvent>) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScoreRationaleSheet(
+    rationale: String,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.why_this_score_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = rationale,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.score_rationale_footer),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @Composable
 private fun LevelPill(label: String, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -337,6 +464,7 @@ private fun LevelPill(label: String, color: Color) {
             text = label,
             color = color,
             style = MaterialTheme.typography.titleMedium,
+            fontFamily = HeroFontFamily,
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -438,21 +566,21 @@ private fun EventCard(event: TopEvent) {
 
 @Composable
 private fun DisclaimerBox() {
-    val disclaimerColor = if (isSystemInDarkTheme()) {
-        Color(0xFF1D2328)
-    } else {
-        BrandPalette.warmCream
-    }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = disclaimerColor,
-        shape = RoundedCornerShape(16.dp),
-        tonalElevation = 1.dp,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.Top,
     ) {
         Text(
+            text = stringResource(R.string.dashboard_ai_disclaimer_icon),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 6.dp),
+        )
+        Text(
             text = stringResource(R.string.dashboard_ai_disclaimer),
-            modifier = Modifier.padding(12.dp),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -499,17 +627,82 @@ private fun LoadingState(
     countryName: String,
     onOpenSettings: () -> Unit,
 ) {
+    val shimmerOffset = remember { Animatable(-300f) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            shimmerOffset.snapTo(-300f)
+            shimmerOffset.animateTo(
+                targetValue = 1_200f,
+                animationSpec = tween(durationMillis = 1_300, easing = LinearEasing),
+            )
+        }
+    }
+    val placeholderBase = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val placeholderHighlight = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(placeholderBase, placeholderHighlight, placeholderBase),
+        start = Offset(shimmerOffset.value - 300f, 0f),
+        end = Offset(shimmerOffset.value, 180f),
+    )
+    val loadingDescription = stringResource(R.string.dashboard_loading)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
         CountryLensChip(countryName = countryName, onClick = onOpenSettings)
-        Spacer(Modifier.height(24.dp))
-        CircularProgressIndicator()
+        Spacer(Modifier.height(12.dp))
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = loadingDescription },
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 1.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ShimmerPlaceholder(
+                    brush = shimmerBrush,
+                    modifier = Modifier.width(176.dp).height(92.dp),
+                    shape = RoundedCornerShape(16.dp),
+                )
+                Spacer(Modifier.height(10.dp))
+                ShimmerPlaceholder(
+                    brush = shimmerBrush,
+                    modifier = Modifier.width(104.dp).height(24.dp),
+                    shape = RoundedCornerShape(12.dp),
+                )
+                Spacer(Modifier.height(24.dp))
+                ShimmerPlaceholder(
+                    brush = shimmerBrush,
+                    modifier = Modifier
+                        .fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                )
+                Spacer(Modifier.height(28.dp))
+                ShimmerPlaceholder(
+                    brush = shimmerBrush,
+                    modifier = Modifier.fillMaxWidth(0.72f).height(18.dp),
+                    shape = RoundedCornerShape(9.dp),
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun ShimmerPlaceholder(
+    brush: Brush,
+    modifier: Modifier,
+    shape: RoundedCornerShape,
+) {
+    Box(modifier = modifier.background(brush, shape))
 }
 
 @Composable
