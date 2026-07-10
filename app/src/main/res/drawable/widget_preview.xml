@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    WB-055: placeholder preview used in widget picker (android:previewImage).
+    Replace with a real AVD screenshot PNG (e.g. widget_preview.webp) before Play Store submission.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/widget_bg_calm" />
+</layer-list>

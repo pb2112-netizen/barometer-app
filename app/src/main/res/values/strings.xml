@@ -56,6 +56,12 @@
     <string name="settings_widget_reliability_title">Reliable widget updates</string>
     <string name="settings_widget_reliability_description">Baro refreshes your widget about once an hour. On some phones, battery optimization delays background updates. Tap to allow unrestricted background activity.</string>
 
+    <!-- WB-055: widget premium strings -->
+    <string name="widget_description">World importance score at a glance, updated hourly</string>
+    <string name="widget_stale_suffix">May be outdated</string>
+    <string name="widget_content_description_stale_suffix">Data may be outdated.</string>
+    <string name="widget_top_event_prefix">Top event:</string>
+
     <!-- WB-054: dashboard + notifications — no hardcoded UI literals in Kotlin -->
     <string name="offline_banner">Offline — showing last known result</string>
     <string name="stale_banner">Data may be out of date</string>
