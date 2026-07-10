@@ -45,13 +45,16 @@ val SignificantMarkerColor = Color(0xFFEAB308)
 private const val MARKER_HALO_ALPHA = 0.3825f
 private const val MARKER_HALO_RADIUS_MULTIPLIER = 2.2f
 
+/** WB-055: single source of truth for anchor marker radius — dashboard and widget use the same value. */
+const val ANCHOR_MARKER_RADIUS_DP = 3.5f
+
 /** Dashboard sparkline uses ~70% width, centered in parent. */
 const val DASHBOARD_CHART_WIDTH_FRACTION = 0.7f
 
 @Composable
 fun SignificantMarkerDot(
     modifier: Modifier = Modifier,
-    dotRadius: Dp = 4.dp,
+    dotRadius: Dp = ANCHOR_MARKER_RADIUS_DP.dp,
     color: Color = SignificantMarkerColor,
 ) {
     val density = LocalDensity.current
@@ -427,6 +430,8 @@ object SparklineBitmap {
         val lineStroke = 1f * density * config.lineStrokeScale
         val pointRadius = 2.5f * density * config.pointScale
         val haloRadius = 5f * density * config.pointScale
+        // WB-055: anchor marker uses same radius as dashboard SparklineChart (parity)
+        val anchorMarkerRadius = ANCHOR_MARKER_RADIUS_DP * density
 
         val plotLeft = axisPad
         val plotBottom = safeHeight - axisPad - axisWidth
@@ -467,8 +472,8 @@ object SparklineBitmap {
                     color = peakMarkerColor.copy(alpha = MARKER_HALO_ALPHA).toArgb()
                     style = Paint.Style.FILL
                 }
-                canvas.drawCircle(px, py, pointRadius * MARKER_HALO_RADIUS_MULTIPLIER, haloPaint)
-                canvas.drawCircle(px, py, pointRadius, peakPaint)
+                canvas.drawCircle(px, py, anchorMarkerRadius * MARKER_HALO_RADIUS_MULTIPLIER, haloPaint)
+                canvas.drawCircle(px, py, anchorMarkerRadius, peakPaint)
             }
         }
 
@@ -496,7 +501,7 @@ object SparklineBitmap {
 
 /** Mały marker amber z halo — bitmapa dla widgetu Glance. */
 object SignificantMarkerBitmap {
-    fun render(context: Context, dotRadiusDp: Dp = 2.5.dp): Bitmap {
+    fun render(context: Context, dotRadiusDp: Dp = ANCHOR_MARKER_RADIUS_DP.dp): Bitmap {
         val density = context.resources.displayMetrics.density
         val dotRadiusPx = dotRadiusDp.value * density
         val haloRadiusPx = dotRadiusPx * MARKER_HALO_RADIUS_MULTIPLIER
