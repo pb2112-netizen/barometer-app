@@ -25,8 +25,17 @@ data class BarometerData(
     @SerialName("lens_name_en") val lensNameEn: String? = null,
     /** WB-003/WB-029: rolling 48h history of global_score (sorted ascending by t). */
     @SerialName("score_history") val scoreHistory: List<ScoreHistoryPoint> = emptyList(),
-    /** WB-030: ISO UTC when current top_events story first entered history. */
-    @SerialName("events_anchor_at") val eventsAnchorAt: String? = null,
+    /** WB-060: MSE = highest peak_score within a 24h window (replaces events_anchor_at). */
+    @SerialName("most_significant_event") val mostSignificantEvent: MostSignificantEvent? = null,
+)
+
+/** WB-060: "Most significant event" — highest peak_score among topics detected within 24h. */
+@Serializable
+data class MostSignificantEvent(
+    val label: String = "",
+    val score: Double = 0.0,
+    val sentiment: String? = null,
+    @SerialName("detected_at") val detectedAt: String? = null,
 )
 
 @Serializable
@@ -53,4 +62,6 @@ data class TopEvent(
     val sources: List<String> = emptyList(),
     /** WB-047: klikalne linki do artykułów wydawców (deterministycznie z RSS w silniku). */
     @SerialName("source_links") val sourceLinks: List<SourceLink> = emptyList(),
+    /** WB-059: ISO UTC pierwszego wykrycia tematu w top_events (silnik, deterministyczne). */
+    @SerialName("detected_at") val detectedAt: String? = null,
 )

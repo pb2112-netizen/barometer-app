@@ -32,13 +32,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.worldbarometer.app.data.model.ScoreHistoryPoint
-import com.worldbarometer.app.data.model.TopEvent
 import java.time.Duration
 import java.time.Instant
-import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Amber marker for events anchor on sparkline (WB-029/WB-030). */
+/** Default/fallback color for the static "Most significant event" marker (WB-060). */
 val SignificantMarkerColor = Color(0xFFEAB308)
 
 /** Static halo matching pulsing “now” marker at peak alpha (0.85 × 0.45). */
@@ -70,77 +68,14 @@ fun SignificantMarkerDot(
     }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMarkerWithHalo(
-    center: Offset,
-    pointRadius: Float,
-    color: Color,
-) {
-    drawCircle(
-        color = color.copy(alpha = MARKER_HALO_ALPHA),
-        radius = pointRadius * MARKER_HALO_RADIUS_MULTIPLIER,
-        center = center,
-    )
-    drawCircle(color = color, radius = pointRadius, center = center)
-}
-
-data class EventsAnchor(
-    val historyIndex: Int,
-    val score: Double,
-    val timestamp: String,
-)
-
-/** WB-030: last history point at or before events_anchor_at from JSON. */
-fun findEventsAnchor(
-    history: List<ScoreHistoryPoint>,
-    eventsAnchorAt: String?,
-): EventsAnchor? {
-    if (eventsAnchorAt.isNullOrBlank()) return null
-    if (history.size < 2) return null
-
-    val anchorInstant = Sparkline.parseInstant(eventsAnchorAt) ?: return null
-    var bestIndex: Int? = null
-    var bestInstant: Instant? = null
-
-    history.forEachIndexed { index, point ->
-        val pointInstant = Sparkline.parseInstant(point.timestamp) ?: return@forEachIndexed
-        if (!pointInstant.isAfter(anchorInstant)) {
-            if (bestInstant == null || pointInstant.isAfter(bestInstant)) {
-                bestInstant = pointInstant
-                bestIndex = index
-            }
-        }
-    }
-
-    return bestIndex?.let { index ->
-        EventsAnchor(
-            historyIndex = index,
-            score = history[index].score,
-            timestamp = history[index].timestamp,
-        )
-    }
-}
-
-/** WB-030: marker + header only when anchor is in the past (not current cycle). */
-fun resolveVisibleEventsAnchor(
-    history: List<ScoreHistoryPoint>,
-    eventsAnchorAt: String?,
-    topEvents: List<TopEvent>,
-    shortSummary: String,
-): EventsAnchor? {
-    if (eventsAnchorAt.isNullOrBlank()) return null
-    if (topEvents.isEmpty()) return null
-    if (!ShortSummaryRules.isDisplayableShortSummary(shortSummary)) return null
-
-    val anchor = findEventsAnchor(history, eventsAnchorAt) ?: return null
-    if (anchor.historyIndex >= history.lastIndex) return null
-    return anchor
-}
-
-/** Wspólna logika sparkline (WB-003/WB-029): stała skala Y 1–10, okno czasu 48 h. */
+/** Wspólna logika sparkline (WB-003/WB-029): stała skala Y 1–10; dane silnika 48h (WB-060: renderowanie 24h). */
 object Sparkline {
     const val Y_MIN = 1.0
     const val Y_MAX = 10.0
+    /** Retencja danych w silniku (HISTORY_HOURS) — dokumentacyjne, nieużywane już w rysowaniu (WB-060). */
     const val WINDOW_HOURS = 48L
+    /** WB-060: okno RENDEROWANIA wykresu — 24h (dane w JSON nadal 48h, kompatybilność). */
+    const val DISPLAY_WINDOW_HOURS = 24L
 
     /** Keeps score=1 one dot above the x-axis. */
     const val Y_BOTTOM_INSET_RATIO = 0.085f
@@ -154,7 +89,6 @@ object Sparkline {
         val lineColor: Color,
         val axisColor: Color,
         val lastPointColor: Color,
-        val peakMarkerColor: Color = SignificantMarkerColor,
         val enablePulse: Boolean = false,
     )
 
@@ -164,16 +98,43 @@ object Sparkline {
         val pointScale: Float = 1f,
     )
 
+    /** WB-060: filtruje historie do okna wyswietlania (usuwa punkty starsze, nie clampuje na krawedzi). */
+    fun pointsInWindow(
+        history: List<ScoreHistoryPoint>,
+        windowEnd: Instant,
+        windowHours: Long = DISPLAY_WINDOW_HOURS,
+    ): List<ScoreHistoryPoint> {
+        val cutoff = windowEnd.minus(Duration.ofHours(windowHours))
+        return history.filter { point ->
+            val instant = parseInstant(point.timestamp) ?: return@filter false
+            !instant.isBefore(cutoff)
+        }
+    }
+
+    /** WB-060: lekkie wygladzenie — tlumi tylko male wahania, zachowuje realne skoki (delta >= threshold). */
+    fun smoothed(history: List<ScoreHistoryPoint>, deltaThreshold: Double = 0.6): List<ScoreHistoryPoint> {
+        if (history.size < 3) return history
+        return history.mapIndexed { index, point ->
+            if (index == 0 || index == history.lastIndex) return@mapIndexed point
+            val prev = history[index - 1].score
+            val next = history[index + 1].score
+            val isBigJump = kotlin.math.abs(point.score - prev) >= deltaThreshold ||
+                kotlin.math.abs(next - point.score) >= deltaThreshold
+            if (isBigJump) point else point.copy(score = 0.25 * prev + 0.5 * point.score + 0.25 * next)
+        }
+    }
+
     fun plotPoints(
         history: List<ScoreHistoryPoint>,
         windowEnd: Instant,
         plotWidth: Float,
         plotHeight: Float,
+        windowHours: Long = DISPLAY_WINDOW_HOURS,
     ): List<PlotPoint> {
         if (plotWidth <= 0f || plotHeight <= 0f) return emptyList()
 
         return history.mapNotNull { point ->
-            plotPointAt(point, windowEnd, plotWidth, plotHeight)
+            plotPointAt(point, windowEnd, plotWidth, plotHeight, windowHours)
         }
     }
 
@@ -183,22 +144,10 @@ object Sparkline {
         windowEnd: Instant,
         plotWidth: Float,
         plotHeight: Float,
+        windowHours: Long = DISPLAY_WINDOW_HOURS,
     ): PlotPoint? {
         if (historyIndex !in history.indices) return null
-        return plotPointAt(history[historyIndex], windowEnd, plotWidth, plotHeight)
-    }
-
-    /** WB-031: X from anchor time; Y on X-axis (not score line). */
-    fun plotAxisMarkerAtIndex(
-        history: List<ScoreHistoryPoint>,
-        historyIndex: Int,
-        windowEnd: Instant,
-        plotWidth: Float,
-        plotHeight: Float,
-    ): PlotPoint? {
-        if (historyIndex !in history.indices) return null
-        val point = plotPointAt(history[historyIndex], windowEnd, plotWidth, plotHeight) ?: return null
-        return PlotPoint(x = point.x, y = plotHeight)
+        return plotPointAt(history[historyIndex], windowEnd, plotWidth, plotHeight, windowHours)
     }
 
     fun scoreToPlotY(score: Double, plotHeight: Float): Float {
@@ -220,10 +169,11 @@ object Sparkline {
         windowEnd: Instant,
         plotWidth: Float,
         plotHeight: Float,
+        windowHours: Long,
     ): PlotPoint? {
         val instant = parseInstant(point.timestamp) ?: return null
-        val windowStart = windowEnd.minus(Duration.ofHours(WINDOW_HOURS))
-        val windowMillis = Duration.ofHours(WINDOW_HOURS).toMillis().toFloat().coerceAtLeast(1f)
+        val windowStart = windowEnd.minus(Duration.ofHours(windowHours))
+        val windowMillis = Duration.ofHours(windowHours).toMillis().toFloat().coerceAtLeast(1f)
         val xRatio = ((instant.toEpochMilli() - windowStart.toEpochMilli()).toFloat() / windowMillis)
             .coerceIn(0f, 1f)
         return PlotPoint(
@@ -291,11 +241,6 @@ private fun buildAndroidSmoothPath(points: List<Sparkline.PlotPoint>, plotLeft: 
     return path
 }
 
-fun hoursAgo(anchorTimestamp: String, windowEnd: Instant): Int {
-    val anchor = Sparkline.parseInstant(anchorTimestamp) ?: return 0
-    return Duration.between(anchor, windowEnd).toHours().toInt().coerceAtLeast(0)
-}
-
 @Composable
 fun SparklineChart(
     history: List<ScoreHistoryPoint>,
@@ -305,15 +250,14 @@ fun SparklineChart(
     contentDescription: String,
     modifier: Modifier = Modifier,
     height: Dp = 56.dp,
-    peakIndex: Int? = null,
     lineColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
     axisColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
-    peakMarkerColor: Color = SignificantMarkerColor,
 ) {
     val density = LocalDensity.current
     val axisWidth = with(density) { 1.dp.toPx() }
     val axisPad = with(density) { 4.dp.toPx() }
-    val lineStroke = with(density) { 1.5.dp.toPx() }
+    // WB-060: grubsza linia (kosmetyka) — 1.5dp -> 2.5dp.
+    val lineStroke = with(density) { 2.5.dp.toPx() }
     val pointRadius = with(density) { 3.5.dp.toPx() }
     val infiniteTransition = rememberInfiniteTransition(label = "sparkline")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -327,7 +271,6 @@ fun SparklineChart(
         lineColor = lineColor,
         axisColor = axisColor,
         lastPointColor = lastPointColor,
-        peakMarkerColor = peakMarkerColor,
         enablePulse = enablePulse,
     )
 
@@ -344,8 +287,11 @@ fun SparklineChart(
 
         drawAxes(plotLeft, plotBottom, plotWidth, axisWidth, style.axisColor, showYAxis = false)
 
+        // WB-060: okno renderowania 24h + lekkie wygladzenie (zachowuje realne skoki).
         val end = Sparkline.windowEnd(history, updatedAt)
-        val points = Sparkline.plotPoints(history, end, plotWidth, plotHeight)
+        val windowed = Sparkline.pointsInWindow(history, end)
+        val smoothedHistory = Sparkline.smoothed(windowed)
+        val points = Sparkline.plotPoints(smoothedHistory, end, plotWidth, plotHeight, windowHours = Sparkline.DISPLAY_WINDOW_HOURS)
         if (points.isEmpty()) return@Canvas
 
         val offsetPoints = points.map { Offset(plotLeft + it.x, it.y) }
@@ -354,13 +300,6 @@ fun SparklineChart(
             color = style.lineColor,
             style = Stroke(width = lineStroke, cap = StrokeCap.Round),
         )
-
-        peakIndex?.let { index ->
-            Sparkline.plotAxisMarkerAtIndex(history, index, end, plotWidth, plotHeight)?.let { peak ->
-                val center = Offset(plotLeft + peak.x, plotBottom)
-                drawMarkerWithHalo(center, pointRadius, style.peakMarkerColor)
-            }
-        }
 
         val last = offsetPoints.last()
         if (style.enablePulse) {
@@ -404,7 +343,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAxes(
 object SparklineBitmap {
     private val widgetConfig = Sparkline.RenderConfig(
         showYAxis = false,
-        lineStrokeScale = 1.1f,
+        // WB-060: grubsza linia (kosmetyka, proporcjonalnie do mniejszego płótna widgetu).
+        lineStrokeScale = 1.6f,
         pointScale = 1.1f,
     )
 
@@ -415,8 +355,6 @@ object SparklineBitmap {
         widthPx: Int,
         heightPx: Int,
         lastPointColor: Color = Color.White,
-        peakIndex: Int? = null,
-        peakMarkerColor: Color = SignificantMarkerColor,
         config: Sparkline.RenderConfig = widgetConfig,
     ): Bitmap {
         val safeWidth = widthPx.coerceAtLeast(1)
@@ -430,8 +368,6 @@ object SparklineBitmap {
         val lineStroke = 1f * density * config.lineStrokeScale
         val pointRadius = 2.5f * density * config.pointScale
         val haloRadius = 5f * density * config.pointScale
-        // WB-055: anchor marker uses same radius as dashboard SparklineChart (parity)
-        val anchorMarkerRadius = ANCHOR_MARKER_RADIUS_DP * density
 
         val plotLeft = axisPad
         val plotBottom = safeHeight - axisPad - axisWidth
@@ -448,8 +384,11 @@ object SparklineBitmap {
         }
         canvas.drawLine(plotLeft, plotBottom, plotLeft + plotWidth, plotBottom, axisPaint)
 
+        // WB-060: okno renderowania 24h + lekkie wygladzenie (zachowuje realne skoki).
         val end = Sparkline.windowEnd(history, updatedAt)
-        val points = Sparkline.plotPoints(history, end, plotWidth, plotHeight)
+        val windowed = Sparkline.pointsInWindow(history, end)
+        val smoothedHistory = Sparkline.smoothed(windowed)
+        val points = Sparkline.plotPoints(smoothedHistory, end, plotWidth, plotHeight, windowHours = Sparkline.DISPLAY_WINDOW_HOURS)
         if (points.isEmpty()) return bitmap
 
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -459,23 +398,6 @@ object SparklineBitmap {
             strokeCap = Paint.Cap.ROUND
         }
         canvas.drawPath(buildAndroidSmoothPath(points, plotLeft), linePaint)
-
-        val peakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = peakMarkerColor.toArgb()
-            style = Paint.Style.FILL
-        }
-        peakIndex?.let { index ->
-            Sparkline.plotAxisMarkerAtIndex(history, index, end, plotWidth, plotHeight)?.let { peak ->
-                val px = plotLeft + peak.x
-                val py = plotBottom
-                val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = peakMarkerColor.copy(alpha = MARKER_HALO_ALPHA).toArgb()
-                    style = Paint.Style.FILL
-                }
-                canvas.drawCircle(px, py, anchorMarkerRadius * MARKER_HALO_RADIUS_MULTIPLIER, haloPaint)
-                canvas.drawCircle(px, py, anchorMarkerRadius, peakPaint)
-            }
-        }
 
         val last = points.last()
         val lx = plotLeft + last.x
@@ -499,9 +421,14 @@ object SparklineBitmap {
         (dp.value * context.resources.displayMetrics.density).roundToInt()
 }
 
-/** Mały marker amber z halo — bitmapa dla widgetu Glance. */
+/** Mały marker MSE z halo — bitmapa dla widgetu Glance (WB-060: kolor wg LevelPalette.eventBadgeColor). */
 object SignificantMarkerBitmap {
-    fun render(context: Context, dotRadiusDp: Dp = ANCHOR_MARKER_RADIUS_DP.dp): Bitmap {
+    fun render(
+        context: Context,
+        dotRadiusDp: Dp = ANCHOR_MARKER_RADIUS_DP.dp,
+        color: Color = SignificantMarkerColor,
+    ): Bitmap {
+        val markerColor = color
         val density = context.resources.displayMetrics.density
         val dotRadiusPx = dotRadiusDp.value * density
         val haloRadiusPx = dotRadiusPx * MARKER_HALO_RADIUS_MULTIPLIER
@@ -512,11 +439,11 @@ object SignificantMarkerBitmap {
         val cy = sizePx / 2f
 
         val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = SignificantMarkerColor.copy(alpha = MARKER_HALO_ALPHA).toArgb()
+            this.color = markerColor.copy(alpha = MARKER_HALO_ALPHA).toArgb()
             style = Paint.Style.FILL
         }
         val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = SignificantMarkerColor.toArgb()
+            this.color = markerColor.toArgb()
             style = Paint.Style.FILL
         }
         canvas.drawCircle(cx, cy, haloRadiusPx, haloPaint)

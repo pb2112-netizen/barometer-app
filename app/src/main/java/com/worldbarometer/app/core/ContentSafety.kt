@@ -1,6 +1,7 @@
 package com.worldbarometer.app.core
 
 import com.worldbarometer.app.data.model.BarometerData
+import com.worldbarometer.app.data.model.MostSignificantEvent
 import com.worldbarometer.app.data.model.ScoreHistoryPoint
 import com.worldbarometer.app.data.model.SourceLink
 import com.worldbarometer.app.data.model.TopEvent
@@ -68,6 +69,15 @@ private fun TopEvent.sanitized(): TopEvent = copy(
         .distinctBy { it.url }
         .take(MAX_SOURCE_LINKS)
         .toList(),
+    detectedAt = detectedAt?.sanitizeText(40),
+)
+
+/** WB-060: sanityzacja MSE — sama etykieta zawodowa (label), score/sentiment/detected_at. */
+private fun MostSignificantEvent.sanitized(): MostSignificantEvent = copy(
+    label = label.sanitizeText(MAX_SUMMARY),
+    score = score.clampScore(),
+    sentiment = sentiment?.sanitizeText(20),
+    detectedAt = detectedAt?.sanitizeText(40),
 )
 
 fun BarometerData.sanitized(): BarometerData = copy(
@@ -83,7 +93,7 @@ fun BarometerData.sanitized(): BarometerData = copy(
     levelLabel = levelLabel?.sanitizeText(20),
     tone = tone?.sanitizeText(20),
     trend = trend?.sanitizeText(20),
-    eventsAnchorAt = eventsAnchorAt?.sanitizeText(40),
+    mostSignificantEvent = mostSignificantEvent?.sanitized(),
     // updated_at walidowane przy parsowaniu czasu (RelativeTime); tryb tylko do podglądu.
     tryb = tryb.sanitizeText(80),
 )

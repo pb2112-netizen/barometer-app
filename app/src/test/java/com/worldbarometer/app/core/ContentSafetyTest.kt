@@ -1,8 +1,10 @@
 package com.worldbarometer.app.core
 
 import com.worldbarometer.app.data.model.BarometerData
+import com.worldbarometer.app.data.model.MostSignificantEvent
 import com.worldbarometer.app.data.model.ScoreHistoryPoint
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -47,5 +49,28 @@ class ContentSafetyTest {
         val sanitized = BarometerData(scoreHistory = history).sanitized()
         assertEquals(10.0, sanitized.scoreHistory[0].score, 0.001)
         assertEquals(1.0, sanitized.scoreHistory[1].score, 0.001)
+    }
+
+    // --- WB-060: most_significant_event ---
+
+    @Test
+    fun sanitized_keepsNullMostSignificantEvent_whenAbsent() {
+        val data = BarometerData(mostSignificantEvent = null).sanitized()
+        assertNull(data.mostSignificantEvent)
+    }
+
+    @Test
+    fun sanitized_clampsScoreAndTrimsFields_onMostSignificantEvent() {
+        val mse = MostSignificantEvent(
+            label = "Breaking\nnews\theadline",
+            score = 99.0,
+            sentiment = "negative",
+            detectedAt = "2026-06-01T10:00:00Z",
+        )
+        val data = BarometerData(mostSignificantEvent = mse).sanitized()
+
+        assertEquals(10.0, data.mostSignificantEvent!!.score, 0.001)
+        assertEquals("Breaking news headline", data.mostSignificantEvent!!.label)
+        assertEquals("negative", data.mostSignificantEvent!!.sentiment)
     }
 }

@@ -74,18 +74,18 @@ import com.worldbarometer.app.R
 import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
-import com.worldbarometer.app.core.ShortSummaryRules
 import com.worldbarometer.app.core.SignificantMarkerDot
+import com.worldbarometer.app.core.SignificantMarkerColor
 import com.worldbarometer.app.core.Sparkline
 import com.worldbarometer.app.core.DASHBOARD_CHART_WIDTH_FRACTION
 import com.worldbarometer.app.core.SparklineChart
 import com.worldbarometer.app.core.Tone
-import com.worldbarometer.app.core.resolveVisibleEventsAnchor
-import com.worldbarometer.app.core.hoursAgo
 import com.worldbarometer.app.core.isAllowedSourceUrl
 import com.worldbarometer.app.core.openUrl
 import com.worldbarometer.app.data.model.TopEvent
 import com.worldbarometer.app.data.repo.BarometerRepository
+import java.time.Duration
+import java.time.Instant
 import java.util.Locale
 
 private val HeroFontFamily = FontFamily(
@@ -167,37 +167,15 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         val scoreText = String.format(Locale.US, "%.1f", data.globalScore)
-        val eventsAnchor = resolveVisibleEventsAnchor(
-            history = data.scoreHistory,
-            eventsAnchorAt = data.eventsAnchorAt,
-            topEvents = data.topEvents,
-            shortSummary = data.shortSummary,
+        val mse = data.mostSignificantEvent
+        val sparklineDescription = stringResource(
+            R.string.sparkline_content_description,
+            snapshot.trend.name.lowercase(Locale.US),
+            scoreText,
         )
-        val showEventHeader = eventsAnchor != null
-        val windowEnd = Sparkline.windowEnd(data.scoreHistory, data.updatedAt)
-        val anchorDescription = eventsAnchor?.let { anchor ->
-            stringResource(
-                R.string.significant_peak_description,
-                hoursAgo(anchor.timestamp, windowEnd),
-                String.format(Locale.US, "%.1f", anchor.score),
-            )
-        }
-        val sparklineDescription = buildString {
-            append(
-                stringResource(
-                    R.string.sparkline_content_description,
-                    snapshot.trend.name.lowercase(Locale.US),
-                    scoreText,
-                ),
-            )
-            if (anchorDescription != null) append(" $anchorDescription")
-        }
         val enablePulse = !state.isStale && !state.isOffline && data.scoreHistory.size >= 3
         // a11y (WB-014 §4.6): ton niesiony tekstem opisu — TalkBack nie polega na kolorze.
-        val scoreDescription = buildString {
-            append(stringResource(LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel))
-            if (anchorDescription != null) append(" $anchorDescription")
-        }
+        val scoreDescription = stringResource(LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel)
         var showRationaleSheet by remember { mutableStateOf(false) }
         val rationaleAvailable = data.rationale.isNotBlank()
         val whyScoreCd = stringResource(R.string.why_this_score_cd)
@@ -284,7 +262,6 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                         lastPointColor = levelColor,
                         enablePulse = enablePulse,
                         contentDescription = sparklineDescription,
-                        peakIndex = eventsAnchor?.historyIndex,
                         modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
                     )
                     Row(
@@ -319,23 +296,38 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                 }
                 Spacer(Modifier.height(16.dp))
 
-                if (ShortSummaryRules.isDisplayableShortSummary(data.shortSummary)) {
-                    if (showEventHeader) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            SignificantMarkerDot(
-                                dotRadius = 3.dp,
-                                modifier = Modifier.padding(end = 6.dp),
-                            )
-                            Text(
-                                text = stringResource(R.string.last_significant_event),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
+                // WB-060: "Most significant event" — blok ZAWSZE widoczny (bez warunku sticky/nowosc).
+                val mseDescription = stringResource(
+                    R.string.mse_description,
+                    mse?.label ?: stringResource(R.string.mse_gathering_data),
+                    mse?.let { String.format(Locale.US, "%.1f", it.score) } ?: "—",
+                    mse?.let { detectedAgoPhrase(it.detectedAt) } ?: "unknown",
+                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.semantics(mergeDescendants = true) {
+                        contentDescription = mseDescription
+                    },
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SignificantMarkerDot(
+                            dotRadius = 3.dp,
+                            modifier = Modifier.padding(end = 6.dp),
+                            color = if (mse != null) {
+                                LevelPalette.eventBadgeColor(mse.score, Tone.fromString(mse.sentiment))
+                            } else {
+                                SignificantMarkerColor
+                            },
+                        )
+                        Text(
+                            text = stringResource(R.string.most_significant_event),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        text = data.shortSummary,
+                        text = mse?.label ?: stringResource(R.string.mse_gathering_data),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
@@ -470,6 +462,27 @@ private fun LevelPill(label: String, color: Color) {
     }
 }
 
+/**
+ * Pełna forma słowna czasu wykrycia dla a11y (WB-059), np. "12 hours ago", "less than 1 hour ago".
+ * WB-060: cap na 24h+ ("more than a day ago") — zgodny z RelativeTime.formatShortAgo.
+ * Widoczny tekst karty pozostaje krótki (RelativeTime.formatShortAgo) — to tylko opis dostępności.
+ */
+private fun detectedAgoFullPhrase(isoUtc: String?, nowMillis: Long = System.currentTimeMillis()): String? {
+    val instant = RelativeTime.parseOrNull(isoUtc) ?: return null
+    val now = Instant.ofEpochMilli(nowMillis)
+    if (instant.isAfter(now)) return "less than 1 hour ago"
+    val hours = Duration.between(instant, now).toHours()
+    return when {
+        hours < 1 -> "less than 1 hour ago"
+        hours < 24 -> if (hours == 1L) "1 hour ago" else "$hours hours ago"
+        else -> "more than a day ago"
+    }
+}
+
+/** WB-060: jak [detectedAgoFullPhrase], bez końcowego "ago" (używane w szablonie mse_description). */
+private fun detectedAgoPhrase(isoUtc: String?, nowMillis: Long = System.currentTimeMillis()): String? =
+    detectedAgoFullPhrase(isoUtc, nowMillis)?.removeSuffix(" ago")
+
 @Composable
 private fun EventCard(event: TopEvent) {
     var expanded by remember { mutableStateOf(false) }
@@ -484,8 +497,31 @@ private fun EventCard(event: TopEvent) {
         shape = RoundedCornerShape(16.dp),
         tonalElevation = 1.dp,
     ) {
-        Row(modifier = Modifier.padding(14.dp)) {
-            ScoreBadge(score = event.score, sentiment = Tone.fromString(event.sentiment))
+        Row(
+            modifier = Modifier
+                .padding(14.dp)
+                .defaultMinSize(minHeight = 64.dp), // WB-059: miejsce na badge + label z paddingiem
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                ScoreBadge(score = event.score, sentiment = Tone.fromString(event.sentiment))
+                val agoText = RelativeTime.formatShortAgo(event.detectedAt)
+                if (agoText != null) {
+                    Spacer(Modifier.height(4.dp))
+                    val agoFullPhrase = detectedAgoFullPhrase(event.detectedAt)
+                    val agoCd = agoFullPhrase?.let { stringResource(R.string.event_detected_a11y, it) }
+                    Text(
+                        text = agoText,
+                        style = MaterialTheme.typography.labelSmall,
+                        // Neutralny, spokojny kolor — niezależny od score/sentymentu eventu (WB-059).
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = if (agoCd != null) {
+                            Modifier.semantics { contentDescription = agoCd }
+                        } else {
+                            Modifier
+                        },
+                    )
+                }
+            }
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

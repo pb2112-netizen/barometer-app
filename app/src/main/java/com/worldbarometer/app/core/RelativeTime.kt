@@ -1,5 +1,6 @@
 package com.worldbarometer.app.core
 
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -47,5 +48,22 @@ object RelativeTime {
     fun formatAbsoluteFull(isoUtc: String?): String {
         val instant = parseOrNull(isoUtc) ?: return "no timestamp"
         return instant.atZone(ZoneId.systemDefault()).format(fullDateTimeFormatter)
+    }
+
+    /**
+     * Krótki czas względny „od wykrycia" (WB-059) — np. „just now", „12h ago", „23h ago".
+     * WB-060: cap na **24h+** (statyczny tekst) — bez liczenia dokładnych godzin/dni powyżej.
+     * null gdy brak/niepoprawny isoUtc (etykieta w UI wtedy ukryta całkowicie).
+     */
+    fun formatShortAgo(isoUtc: String?, nowMillis: Long = System.currentTimeMillis()): String? {
+        val instant = parseOrNull(isoUtc) ?: return null
+        val now = Instant.ofEpochMilli(nowMillis)
+        if (instant.isAfter(now)) return "just now"
+        val hours = Duration.between(instant, now).toHours()
+        return when {
+            hours < 1 -> "just now"
+            hours < 24 -> "${hours}h ago"
+            else -> "24h+"
+        }
     }
 }

@@ -13,8 +13,8 @@ android {
         applicationId = "com.worldbarometer.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 30
-        versionName = "0.9.5"
+        versionCode = 31
+        versionName = "0.10.0"
     }
 
     buildTypes {

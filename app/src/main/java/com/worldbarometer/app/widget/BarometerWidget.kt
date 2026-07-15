@@ -49,18 +49,17 @@ import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
-import com.worldbarometer.app.core.ShortSummaryRules
 import com.worldbarometer.app.core.SignificantMarkerBitmap
-import com.worldbarometer.app.core.EventsAnchor
-import com.worldbarometer.app.core.resolveVisibleEventsAnchor
-import com.worldbarometer.app.core.Sparkline
+import com.worldbarometer.app.core.SignificantMarkerColor
 import com.worldbarometer.app.core.SparklineBitmap
 import com.worldbarometer.app.core.Tone
-import com.worldbarometer.app.core.hoursAgo
+import com.worldbarometer.app.data.model.MostSignificantEvent
 import com.worldbarometer.app.data.model.ScoreHistoryPoint
 import com.worldbarometer.app.data.repo.BarometerRepository
 import com.worldbarometer.app.di.ServiceLocator
 import kotlinx.coroutines.flow.scan
+import java.time.Duration
+import java.time.Instant
 import java.util.Locale
 
 private val ScoreFontSize = 34.sp
@@ -115,7 +114,6 @@ private fun WidgetContent(
     val level = snapshot?.level ?: Level.STABLE
     val tone = snapshot?.tone ?: Tone.NEUTRAL
     val scoreText = snapshot?.let { String.format(Locale.US, "%.1f", it.data.globalScore) } ?: "—"
-    val summary = snapshot?.data?.shortSummary.orEmpty()
     val context = LocalContext.current
     val levelLabel = context.getString(LevelPalette.labelRes(level, tone))
     val updatedText = snapshot?.let { "Updated ${RelativeTime.formatAbsolute(it.data.updatedAt)}" } ?: ""
@@ -124,16 +122,9 @@ private fun WidgetContent(
     val isStale = snapshot?.isStale(System.currentTimeMillis()) ?: false
 
     val history = snapshot?.data?.scoreHistory.orEmpty()
-    val eventsAnchor = snapshot?.let {
-        resolveVisibleEventsAnchor(
-            history = history,
-            eventsAnchorAt = it.data.eventsAnchorAt,
-            topEvents = it.data.topEvents,
-            shortSummary = summary,
-        )
-    }
-    val displayableSummary = ShortSummaryRules.isDisplayableShortSummary(summary)
-    val showEventHeader = eventsAnchor != null
+    // WB-060: "Most significant event" zastępuje eventsAnchor/shortSummary jako sticky nagłówek.
+    val mse = snapshot?.data?.mostSignificantEvent
+    val mseLabel = mse?.label ?: context.getString(R.string.mse_gathering_data)
 
     val topEventTitle = snapshot?.data?.topEvents?.firstOrNull()?.title.orEmpty()
 
@@ -156,8 +147,7 @@ private fun WidgetContent(
         tone = tone,
         countryName = countryName,
         updatedText = updatedText,
-        eventsAnchor = eventsAnchor,
-        updatedAt = snapshot?.data?.updatedAt,
+        mse = mse,
         isStale = isStale,
     )
 
@@ -195,15 +185,13 @@ private fun WidgetContent(
                 scoreText = scoreText,
                 levelLabel = levelLabel,
                 updatedText = updatedText,
-                summary = summary,
+                mse = mse,
+                mseLabel = mseLabel,
                 countryName = countryName,
                 isStale = isStale,
-                showEventHeader = showEventHeader,
-                displayableSummary = displayableSummary,
                 topEventTitle = topEventTitle,
                 snapshot = snapshot,
                 history = history,
-                eventsAnchor = eventsAnchor,
                 sparklineWidth = sparklineWidth,
                 sparklineHeight = sparklineHeight,
                 sparklineWidthPx = sparklineWidthPx,
@@ -215,14 +203,12 @@ private fun WidgetContent(
                 scoreText = scoreText,
                 levelLabel = levelLabel,
                 updatedText = updatedText,
-                summary = summary,
+                mse = mse,
+                mseLabel = mseLabel,
                 countryName = countryName,
                 isStale = isStale,
-                showEventHeader = showEventHeader,
-                displayableSummary = displayableSummary,
                 snapshot = snapshot,
                 history = history,
-                eventsAnchor = eventsAnchor,
                 sparklineWidth = sparklineWidth,
                 sparklineHeight = sparklineHeight,
                 sparklineWidthPx = sparklineWidthPx,
@@ -303,14 +289,12 @@ private fun StandardWidgetContent(
     scoreText: String,
     levelLabel: String,
     updatedText: String,
-    summary: String,
+    mse: MostSignificantEvent?,
+    mseLabel: String,
     countryName: String,
     isStale: Boolean,
-    showEventHeader: Boolean,
-    displayableSummary: Boolean,
     snapshot: BarometerRepository.Snapshot?,
     history: List<ScoreHistoryPoint>,
-    eventsAnchor: EventsAnchor?,
     sparklineWidth: Dp,
     sparklineHeight: Dp,
     sparklineWidthPx: Int,
@@ -328,7 +312,6 @@ private fun StandardWidgetContent(
             sparklineHeight = sparklineHeight,
             sparklineWidthPx = sparklineWidthPx,
             sparklineHeightPx = sparklineHeightPx,
-            peakIndex = eventsAnchor?.historyIndex,
         )
 
         Spacer(GlanceModifier.defaultWeight())
@@ -348,40 +331,40 @@ private fun StandardWidgetContent(
                 )
             }
 
-            if (showEventHeader && displayableSummary) {
-                Spacer(GlanceModifier.height(4.dp))
-                Box(
-                    modifier = GlanceModifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val markerBitmap = remember {
-                            SignificantMarkerBitmap.render(context)
-                        }
-                        Image(
-                            provider = ImageProvider(markerBitmap),
-                            contentDescription = null,
-                            modifier = GlanceModifier.size(WidgetMarkerDotSize),
-                        )
-                        Spacer(GlanceModifier.width(4.dp))
-                        Text(
-                            text = context.getString(R.string.last_significant_event),
-                            style = TextStyle(color = white, fontSize = 10.sp),
-                            maxLines = 1,
-                        )
+            // WB-060: blok "Most significant event" — ZAWSZE widoczny (marker kolorowany lub fallback).
+            Spacer(GlanceModifier.height(4.dp))
+            Box(
+                modifier = GlanceModifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val markerColor = mse?.let {
+                        LevelPalette.eventBadgeColor(it.score, Tone.fromString(it.sentiment))
+                    } ?: SignificantMarkerColor
+                    val markerBitmap = remember(markerColor) {
+                        SignificantMarkerBitmap.render(context, color = markerColor)
                     }
+                    Image(
+                        provider = ImageProvider(markerBitmap),
+                        contentDescription = null,
+                        modifier = GlanceModifier.size(WidgetMarkerDotSize),
+                    )
+                    Spacer(GlanceModifier.width(4.dp))
+                    Text(
+                        text = context.getString(R.string.most_significant_event),
+                        style = TextStyle(color = white, fontSize = 10.sp),
+                        maxLines = 1,
+                    )
                 }
             }
 
-            if (displayableSummary) {
-                Spacer(GlanceModifier.height(2.dp))
-                Text(
-                    text = summary,
-                    style = TextStyle(color = white, fontSize = 11.sp, textAlign = TextAlign.Center),
-                    modifier = GlanceModifier.fillMaxWidth(),
-                    maxLines = 2,
-                )
-            }
+            Spacer(GlanceModifier.height(2.dp))
+            Text(
+                text = mseLabel,
+                style = TextStyle(color = white, fontSize = 11.sp, textAlign = TextAlign.Center),
+                modifier = GlanceModifier.fillMaxWidth(),
+                maxLines = 2,
+            )
         }
 
         Spacer(GlanceModifier.defaultWeight())
@@ -402,15 +385,13 @@ private fun WideWidgetContent(
     scoreText: String,
     levelLabel: String,
     updatedText: String,
-    summary: String,
+    mse: MostSignificantEvent?,
+    mseLabel: String,
     countryName: String,
     isStale: Boolean,
-    showEventHeader: Boolean,
-    displayableSummary: Boolean,
     topEventTitle: String,
     snapshot: BarometerRepository.Snapshot?,
     history: List<ScoreHistoryPoint>,
-    eventsAnchor: EventsAnchor?,
     sparklineWidth: Dp,
     sparklineHeight: Dp,
     sparklineWidthPx: Int,
@@ -428,7 +409,6 @@ private fun WideWidgetContent(
             sparklineHeight = sparklineHeight,
             sparklineWidthPx = sparklineWidthPx,
             sparklineHeightPx = sparklineHeightPx,
-            peakIndex = eventsAnchor?.historyIndex,
         )
 
         Spacer(GlanceModifier.defaultWeight())
@@ -448,40 +428,40 @@ private fun WideWidgetContent(
                 )
             }
 
-            if (showEventHeader && displayableSummary) {
-                Spacer(GlanceModifier.height(4.dp))
-                Box(
-                    modifier = GlanceModifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val markerBitmap = remember {
-                            SignificantMarkerBitmap.render(context)
-                        }
-                        Image(
-                            provider = ImageProvider(markerBitmap),
-                            contentDescription = null,
-                            modifier = GlanceModifier.size(WidgetMarkerDotSize),
-                        )
-                        Spacer(GlanceModifier.width(4.dp))
-                        Text(
-                            text = context.getString(R.string.last_significant_event),
-                            style = TextStyle(color = white, fontSize = 10.sp),
-                            maxLines = 1,
-                        )
+            // WB-060: blok "Most significant event" — ZAWSZE widoczny (marker kolorowany lub fallback).
+            Spacer(GlanceModifier.height(4.dp))
+            Box(
+                modifier = GlanceModifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val markerColor = mse?.let {
+                        LevelPalette.eventBadgeColor(it.score, Tone.fromString(it.sentiment))
+                    } ?: SignificantMarkerColor
+                    val markerBitmap = remember(markerColor) {
+                        SignificantMarkerBitmap.render(context, color = markerColor)
                     }
+                    Image(
+                        provider = ImageProvider(markerBitmap),
+                        contentDescription = null,
+                        modifier = GlanceModifier.size(WidgetMarkerDotSize),
+                    )
+                    Spacer(GlanceModifier.width(4.dp))
+                    Text(
+                        text = context.getString(R.string.most_significant_event),
+                        style = TextStyle(color = white, fontSize = 10.sp),
+                        maxLines = 1,
+                    )
                 }
             }
 
-            if (displayableSummary) {
-                Spacer(GlanceModifier.height(2.dp))
-                Text(
-                    text = summary,
-                    style = TextStyle(color = white, fontSize = 11.sp, textAlign = TextAlign.Center),
-                    modifier = GlanceModifier.fillMaxWidth(),
-                    maxLines = 2,
-                )
-            }
+            Spacer(GlanceModifier.height(2.dp))
+            Text(
+                text = mseLabel,
+                style = TextStyle(color = white, fontSize = 11.sp, textAlign = TextAlign.Center),
+                modifier = GlanceModifier.fillMaxWidth(),
+                maxLines = 2,
+            )
 
             // Wide-only: top event title
             if (topEventTitle.isNotBlank()) {
@@ -562,7 +542,6 @@ private fun TopLabelSparklineRow(
     sparklineHeight: Dp,
     sparklineWidthPx: Int,
     sparklineHeightPx: Int,
-    peakIndex: Int?,
 ) {
     val context = LocalContext.current
     val white = ColorProvider(Color.White)
@@ -583,12 +562,12 @@ private fun TopLabelSparklineRow(
             contentAlignment = Alignment.CenterEnd,
         ) {
             if (snapshot != null && history.isNotEmpty()) {
+                // WB-060: okno renderowania 24h — SparklineBitmap.render filtruje/wygładza wewnętrznie.
                 val sparklineBitmap = remember(
                     history,
                     updatedAt,
                     sparklineWidthPx,
                     sparklineHeightPx,
-                    peakIndex,
                 ) {
                     SparklineBitmap.render(
                         context = context,
@@ -596,7 +575,6 @@ private fun TopLabelSparklineRow(
                         updatedAt = updatedAt,
                         widthPx = sparklineWidthPx,
                         heightPx = sparklineHeightPx,
-                        peakIndex = peakIndex,
                     )
                 }
                 Image(
@@ -630,6 +608,19 @@ private fun CountryBadgeGlance(countryName: String) {
     }
 }
 
+/** WB-060: fraza "N hours"/"less than 1 hour" bez końcowego "ago" — używana w `mse_description` (ma "ago" w szablonie). */
+private fun mseDetectedAgoPhrase(isoUtc: String?, nowMillis: Long = System.currentTimeMillis()): String {
+    val instant = runCatching { Instant.parse(isoUtc.orEmpty()) }.getOrNull() ?: return "unknown"
+    val now = Instant.ofEpochMilli(nowMillis)
+    if (instant.isAfter(now)) return "less than 1 hour"
+    val hours = Duration.between(instant, now).toHours()
+    return when {
+        hours < 1 -> "less than 1 hour"
+        hours < 24 -> if (hours == 1L) "1 hour" else "$hours hours"
+        else -> "more than a day"
+    }
+}
+
 private fun buildWidgetContentDescription(
     context: Context,
     snapshot: BarometerRepository.Snapshot?,
@@ -639,8 +630,7 @@ private fun buildWidgetContentDescription(
     tone: Tone,
     countryName: String,
     updatedText: String,
-    eventsAnchor: EventsAnchor?,
-    updatedAt: String?,
+    mse: MostSignificantEvent?,
     isStale: Boolean,
 ): String {
     if (snapshot == null) return context.getString(R.string.app_name)
@@ -650,11 +640,11 @@ private fun buildWidgetContentDescription(
     } else {
         " — ${context.getString(LevelPalette.tonePhraseRes(tone))}"
     }
-    val anchorPart = eventsAnchor?.let { anchor ->
-        val windowEnd = Sparkline.windowEnd(snapshot.data.scoreHistory, updatedAt)
-        val hours = hoursAgo(anchor.timestamp, windowEnd)
-        val anchorScore = String.format(Locale.US, "%.1f", anchor.score)
-        context.getString(R.string.significant_peak_description, hours, anchorScore)
+    // WB-060: "Most significant event" zastępuje dawny anchor/peak a11y opis.
+    val msePart = mse?.let {
+        val agoPhrase = mseDetectedAgoPhrase(it.detectedAt)
+        val mseScore = String.format(Locale.US, "%.1f", it.score)
+        context.getString(R.string.mse_description, it.label, mseScore, agoPhrase)
     }
     return buildString {
         append(
@@ -669,7 +659,7 @@ private fun buildWidgetContentDescription(
                 updatedPart,
             ),
         )
-        if (anchorPart != null) append(" $anchorPart")
+        if (msePart != null) append(" $msePart")
         // WB-055: stale a11y
         if (isStale) append(" ${context.getString(R.string.widget_content_description_stale_suffix)}")
     }
