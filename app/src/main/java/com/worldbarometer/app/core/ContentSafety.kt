@@ -24,7 +24,16 @@ private const val MAX_SOURCES = 8
 private const val MAX_SOURCE_LINKS = 3
 private const val MAX_URL = 2048
 private const val MAX_EVENTS = 3
-private const val MAX_HISTORY_POINTS = 72
+
+/**
+ * Górna granica punktów historii. Silnik trzyma [Sparkline.WINDOW_HOURS] godzin i dopisuje
+ * jeden punkt na cykl; cykl bywa częstszy niż godzinny (cron GA + cron-job.org + ręczne runy),
+ * więc produkcja miewa ~76 punktów w oknie 48 h. Stałe 72 po cichu ucinały najstarsze.
+ * Wyliczamy z okna, z zapasem na 3 cykle/godzinę — limit dalej chroni pamięć, ale nie gubi
+ * danych przy normalnej częstotliwości.
+ */
+private const val MAX_CYCLES_PER_HOUR = 3
+private val MAX_HISTORY_POINTS = (Sparkline.WINDOW_HOURS * MAX_CYCLES_PER_HOUR).toInt()
 
 private fun ScoreHistoryPoint.sanitized(): ScoreHistoryPoint = copy(
     timestamp = timestamp.sanitizeText(40),
@@ -54,6 +63,7 @@ private fun SourceLink.sanitized(): SourceLink? {
 
 private fun TopEvent.sanitized(): TopEvent = copy(
     title = title.sanitizeText(MAX_TITLE),
+    label = label.sanitizeText(MAX_SUMMARY),
     summary = summary.sanitizeText(MAX_EVENT_SUMMARY),
     score = score.clampScore(),
     sentiment = sentiment?.sanitizeText(20),
@@ -72,12 +82,15 @@ private fun TopEvent.sanitized(): TopEvent = copy(
     detectedAt = detectedAt?.sanitizeText(40),
 )
 
-/** WB-060: sanityzacja MSE — sama etykieta zawodowa (label), score/sentiment/detected_at. */
+/** WB-060/WB-064/WB-068: sanityzacja MSE — etykieta, własny opis, tytuł, znaczniki czasu. */
 private fun MostSignificantEvent.sanitized(): MostSignificantEvent = copy(
     label = label.sanitizeText(MAX_SUMMARY),
+    summary = summary.sanitizeText(MAX_EVENT_SUMMARY),
+    title = title.sanitizeText(MAX_TITLE),
     score = score.clampScore(),
     sentiment = sentiment?.sanitizeText(20),
     detectedAt = detectedAt?.sanitizeText(40),
+    peakAt = peakAt?.sanitizeText(40),
 )
 
 fun BarometerData.sanitized(): BarometerData = copy(

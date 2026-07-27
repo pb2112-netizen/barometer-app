@@ -1,6 +1,7 @@
 package com.worldbarometer.app.data.repo
 
 import com.worldbarometer.app.core.Level
+import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.core.Tone
 import com.worldbarometer.app.core.Trend
 import com.worldbarometer.app.core.sanitized
@@ -36,8 +37,24 @@ class BarometerRepository(
         val trend: Trend get() = Trend.fromString(data.trend)
         val scoreHistory get() = data.scoreHistory
 
-        fun isStale(nowMillis: Long, maxAgeMillis: Long = STALE_AFTER_MILLIS): Boolean =
-            fetchedAtMillis <= 0L || (nowMillis - fetchedAtMillis) > maxAgeMillis
+        /**
+         * WB-070: „nieaktualne" liczone z DWÓCH zegarów.
+         *
+         * Dotąd liczył się tylko `fetchedAtMillis`, czyli kiedy APKA pobrała plik. Gdy silnik
+         * stoi (pauza produkcji od 2026-07-21), apka co godzinę pobiera ten sam stary JSON,
+         * `fetchedAtMillis` jest zawsze świeży i banner „Data may be out of date" nie zapala
+         * się nigdy — użytkownik ogląda odczyt sprzed wielu dni jako bieżący. To samo gasiło
+         * przyciemnienie „stale" na widgecie. Teraz wystarczy, że przestarzały jest
+         * którykolwiek zegar: pobranie (sieć padła) albo publikacja (`updated_at` z silnika).
+         *
+         * Brak/niepoprawny `updated_at` nie oznacza staleness sam z siebie — o tym decyduje
+         * wtedy wyłącznie zegar pobrania, jak dotąd.
+         */
+        fun isStale(nowMillis: Long, maxAgeMillis: Long = STALE_AFTER_MILLIS): Boolean {
+            if (fetchedAtMillis <= 0L || (nowMillis - fetchedAtMillis) > maxAgeMillis) return true
+            val publishedAt = RelativeTime.parseOrNull(data.updatedAt) ?: return false
+            return (nowMillis - publishedAt.toEpochMilli()) > maxAgeMillis
+        }
     }
 
     sealed interface RefreshResult {

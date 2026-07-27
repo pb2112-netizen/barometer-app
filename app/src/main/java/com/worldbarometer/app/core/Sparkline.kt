@@ -36,8 +36,24 @@ import java.time.Duration
 import java.time.Instant
 import kotlin.math.roundToInt
 
-/** Default/fallback color for the static "Most significant event" marker (WB-060). */
-val SignificantMarkerColor = Color(0xFFEAB308)
+/**
+ * WB-067: the ONE colour of everything "Most significant event" — the dot next to the label,
+ * the widget marker bitmap, and the highlighted stretch of the chart's time axis.
+ *
+ * Deliberately CONSTANT. WB-060 tinted the marker with
+ * `LevelPalette.eventBadgeColor(peak_score, sentiment)`, which failed three ways: below score
+ * 5 the palette returns brand teal, so the marker vanished into the theme; `positive`
+ * sentiment turned it green on serious news; and the colour came from the PEAK score, so it
+ * advertised "7.9 severe" while the barometer itself read 2.5. Severity already has a carrier
+ * (the ScoreBadge on event cards). This marker only has to say "this is the MSE", and it has
+ * to be findable at a glance.
+ */
+val MseMarkerColor = Color(0xFFEAB308)
+
+/** WB-068: how the MSE stretch is drawn over the neutral time axis. */
+private const val MSE_AXIS_STROKE_MULTIPLIER = 3f
+/** WB-068: height of the tick marking the exact start of the MSE, in axis-stroke units. */
+private const val MSE_START_TICK_MULTIPLIER = 5f
 
 /** Static halo matching pulsing “now” marker at peak alpha (0.85 × 0.45). */
 private const val MARKER_HALO_ALPHA = 0.3825f
@@ -53,7 +69,7 @@ const val DASHBOARD_CHART_WIDTH_FRACTION = 0.7f
 fun SignificantMarkerDot(
     modifier: Modifier = Modifier,
     dotRadius: Dp = ANCHOR_MARKER_RADIUS_DP.dp,
-    color: Color = SignificantMarkerColor,
+    color: Color = MseMarkerColor,
 ) {
     val density = LocalDensity.current
     val dotRadiusPx = with(density) { dotRadius.toPx() }
@@ -182,6 +198,44 @@ object Sparkline {
         )
     }
 
+    /**
+     * WB-068: how long the current MSE has been running, expressed as a fraction of the
+     * visible 24h window. [startRatio] .. [endRatio] map straight onto [scoreToPlotX].
+     *
+     * The span always ends at "now" (the right edge): the MSE is by definition the reigning
+     * champion, so it is still live. It restarts on its own when the champion changes,
+     * because `detectedAt` changes with it — no extra state to keep.
+     *
+     * [startsBeforeWindow] is true when the topic was first detected before the visible
+     * window. That is common after WB-062 (the MSE window runs on `peak_at`, while
+     * `detected_at` stays the FIRST ever detection). The caller then skips the start tick,
+     * so a bar running into the left edge reads as "began earlier" instead of pretending
+     * the story started exactly 24h ago.
+     */
+    data class MseSpan(
+        val startRatio: Float,
+        val endRatio: Float,
+        val startsBeforeWindow: Boolean,
+    )
+
+    fun mseSpan(
+        detectedAtIso: String?,
+        windowEnd: Instant,
+        windowHours: Long = DISPLAY_WINDOW_HOURS,
+    ): MseSpan? {
+        val detected = parseInstant(detectedAtIso.orEmpty()) ?: return null
+        if (detected.isAfter(windowEnd)) return null
+        val windowStart = windowEnd.minus(Duration.ofHours(windowHours))
+        val windowMillis = Duration.ofHours(windowHours).toMillis().toFloat().coerceAtLeast(1f)
+        val startsBeforeWindow = detected.isBefore(windowStart)
+        val rawRatio = (detected.toEpochMilli() - windowStart.toEpochMilli()) / windowMillis
+        return MseSpan(
+            startRatio = rawRatio.coerceIn(0f, 1f),
+            endRatio = 1f,
+            startsBeforeWindow = startsBeforeWindow,
+        )
+    }
+
     fun windowEnd(history: List<ScoreHistoryPoint>, fallbackIso: String?): Instant {
         val fromHistory = history.mapNotNull { parseInstant(it.timestamp) }.maxOrNull()
         if (fromHistory != null) return fromHistory
@@ -252,6 +306,8 @@ fun SparklineChart(
     height: Dp = 56.dp,
     lineColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
     axisColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+    /** WB-068: `most_significant_event.detected_at` — highlights how long the MSE has run. */
+    mseDetectedAt: String? = null,
 ) {
     val density = LocalDensity.current
     val axisWidth = with(density) { 1.dp.toPx() }
@@ -289,6 +345,31 @@ fun SparklineChart(
 
         // WB-060: okno renderowania 24h + lekkie wygladzenie (zachowuje realne skoki).
         val end = Sparkline.windowEnd(history, updatedAt)
+
+        // WB-068: żółty odcinek osi czasu = jak długo trwa bieżące MSE.
+        Sparkline.mseSpan(mseDetectedAt, end)?.let { span ->
+            val x0 = plotLeft + Sparkline.scoreToPlotX(span.startRatio, plotWidth)
+            val x1 = plotLeft + Sparkline.scoreToPlotX(span.endRatio, plotWidth)
+            drawLine(
+                color = MseMarkerColor,
+                start = Offset(x0, plotBottom),
+                end = Offset(x1, plotBottom),
+                strokeWidth = axisWidth * MSE_AXIS_STROKE_MULTIPLIER,
+                cap = StrokeCap.Butt,
+            )
+            // Pionowy znacznik dokładnego początku — pomijany, gdy temat zaczął się przed
+            // oknem: pasek dobity do lewej krawędzi sam czyta się jako "ciągnie się dłużej".
+            if (!span.startsBeforeWindow) {
+                drawLine(
+                    color = MseMarkerColor,
+                    start = Offset(x0, plotBottom),
+                    end = Offset(x0, plotBottom - axisWidth * MSE_START_TICK_MULTIPLIER),
+                    strokeWidth = axisWidth * MSE_AXIS_STROKE_MULTIPLIER,
+                    cap = StrokeCap.Butt,
+                )
+            }
+        }
+
         val windowed = Sparkline.pointsInWindow(history, end)
         val smoothedHistory = Sparkline.smoothed(windowed)
         val points = Sparkline.plotPoints(smoothedHistory, end, plotWidth, plotHeight, windowHours = Sparkline.DISPLAY_WINDOW_HOURS)
@@ -356,6 +437,8 @@ object SparklineBitmap {
         heightPx: Int,
         lastPointColor: Color = Color.White,
         config: Sparkline.RenderConfig = widgetConfig,
+        /** WB-068: `most_significant_event.detected_at` — highlights how long the MSE has run. */
+        mseDetectedAt: String? = null,
     ): Bitmap {
         val safeWidth = widthPx.coerceAtLeast(1)
         val safeHeight = heightPx.coerceAtLeast(1)
@@ -386,6 +469,24 @@ object SparklineBitmap {
 
         // WB-060: okno renderowania 24h + lekkie wygladzenie (zachowuje realne skoki).
         val end = Sparkline.windowEnd(history, updatedAt)
+
+        // WB-068: żółty odcinek osi czasu = jak długo trwa bieżące MSE (parytet z dashboardem).
+        Sparkline.mseSpan(mseDetectedAt, end)?.let { span ->
+            val msePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = MseMarkerColor.toArgb()
+                strokeWidth = axisWidth * MSE_AXIS_STROKE_MULTIPLIER
+                style = Paint.Style.STROKE
+                strokeCap = Paint.Cap.BUTT
+            }
+            val x0 = plotLeft + Sparkline.scoreToPlotX(span.startRatio, plotWidth)
+            val x1 = plotLeft + Sparkline.scoreToPlotX(span.endRatio, plotWidth)
+            canvas.drawLine(x0, plotBottom, x1, plotBottom, msePaint)
+            if (!span.startsBeforeWindow) {
+                canvas.drawLine(
+                    x0, plotBottom, x0, plotBottom - axisWidth * MSE_START_TICK_MULTIPLIER, msePaint,
+                )
+            }
+        }
         val windowed = Sparkline.pointsInWindow(history, end)
         val smoothedHistory = Sparkline.smoothed(windowed)
         val points = Sparkline.plotPoints(smoothedHistory, end, plotWidth, plotHeight, windowHours = Sparkline.DISPLAY_WINDOW_HOURS)
@@ -421,12 +522,12 @@ object SparklineBitmap {
         (dp.value * context.resources.displayMetrics.density).roundToInt()
 }
 
-/** Mały marker MSE z halo — bitmapa dla widgetu Glance (WB-060: kolor wg LevelPalette.eventBadgeColor). */
+/** Mały marker MSE z halo — bitmapa dla widgetu Glance (WB-067: stały żółty [MseMarkerColor]). */
 object SignificantMarkerBitmap {
     fun render(
         context: Context,
         dotRadiusDp: Dp = ANCHOR_MARKER_RADIUS_DP.dp,
-        color: Color = SignificantMarkerColor,
+        color: Color = MseMarkerColor,
     ): Bitmap {
         val markerColor = color
         val density = context.resources.displayMetrics.density

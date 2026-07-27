@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -64,7 +65,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -75,13 +79,12 @@ import com.worldbarometer.app.core.LensCatalog
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.core.SignificantMarkerDot
-import com.worldbarometer.app.core.SignificantMarkerColor
-import com.worldbarometer.app.core.Sparkline
 import com.worldbarometer.app.core.DASHBOARD_CHART_WIDTH_FRACTION
 import com.worldbarometer.app.core.SparklineChart
 import com.worldbarometer.app.core.Tone
 import com.worldbarometer.app.core.isAllowedSourceUrl
 import com.worldbarometer.app.core.openUrl
+import com.worldbarometer.app.data.model.MostSignificantEvent
 import com.worldbarometer.app.data.model.TopEvent
 import com.worldbarometer.app.data.repo.BarometerRepository
 import java.time.Duration
@@ -177,6 +180,10 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         // a11y (WB-014 §4.6): ton niesiony tekstem opisu — TalkBack nie polega na kolorze.
         val scoreDescription = stringResource(LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel)
         var showRationaleSheet by remember { mutableStateOf(false) }
+        // WB-069: osobny arkusz dla MSE. Wcześniej jedyny tap (na cyfrę) pokazywał lensowe
+        // `rationale`, czyli uzasadnienie global_score dla dominanta BIEŻĄCEGO cyklu — inne
+        // wydarzenie niż MSE, ilekroć champion siedzi poza widocznym top-3.
+        var showMseSheet by remember { mutableStateOf(false) }
         val rationaleAvailable = data.rationale.isNotBlank()
         val whyScoreCd = stringResource(R.string.why_this_score_cd)
         val scoreRowModifier = if (rationaleAvailable) {
@@ -247,12 +254,16 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                 }
 
                 LevelPill(label = levelLabel, color = levelColor)
-                Text(
-                    text = stringResource(R.string.tap_score_for_details),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.alpha(0.6f),
-                )
+                // Hint tylko gdy tap faktycznie coś otwiera — przy pustym `rationale`
+                // (stary cache) cyfra nie jest klikalna, a podpowiedź i tak wisiała.
+                if (rationaleAvailable) {
+                    Text(
+                        text = stringResource(R.string.tap_score_for_details),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.alpha(0.6f),
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
 
                 if (data.scoreHistory.size >= 2) {
@@ -262,6 +273,8 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                         lastPointColor = levelColor,
                         enablePulse = enablePulse,
                         contentDescription = sparklineDescription,
+                        // WB-068: żółty odcinek osi czasu = jak długo trwa bieżące MSE.
+                        mseDetectedAt = mse?.detectedAt,
                         modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
                     )
                     Row(
@@ -303,36 +316,66 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                     mse?.let { String.format(Locale.US, "%.1f", it.score) } ?: "—",
                     mse?.let { detectedAgoPhrase(it.detectedAt) } ?: "unknown",
                 )
+                // WB-067: widoczny znacznik czasu ("5h ago"). Dotąd ta fraza istniała
+                // wyłącznie w opisie a11y — wzrokowo nie było jej nigdzie.
+                val mseAgeText = RelativeTime.formatShortAgo(mse?.detectedAt)
+                val mseSheetCd = stringResource(R.string.mse_sheet_cd)
+                val mseBlockModifier = if (mse != null) {
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { showMseSheet = true }
+                        .semantics(mergeDescendants = true) {
+                            role = Role.Button
+                            contentDescription = "$mseDescription. $mseSheetCd"
+                        }
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .semantics(mergeDescendants = true) { contentDescription = mseDescription }
+                }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.semantics(mergeDescendants = true) {
-                        contentDescription = mseDescription
-                    },
+                    modifier = mseBlockModifier,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // WB-067: stały żółty (MseMarkerColor) — bez tonowania wg score/sentymentu.
                         SignificantMarkerDot(
                             dotRadius = 3.dp,
                             modifier = Modifier.padding(end = 6.dp),
-                            color = if (mse != null) {
-                                LevelPalette.eventBadgeColor(mse.score, Tone.fromString(mse.sentiment))
-                            } else {
-                                SignificantMarkerColor
-                            },
                         )
                         Text(
                             text = stringResource(R.string.most_significant_event),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (mseAgeText != null) {
+                            Text(
+                                text = " ${stringResource(R.string.mse_age_separator)} $mseAgeText",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.alpha(0.75f),
+                            )
+                        }
                     }
                     Spacer(Modifier.height(4.dp))
-                    Text(
+                    // WB-065/WB-067: twarde dwie linie. Budżet znaków pilnuje silnik, tu jest
+                    // siatka bezpieczeństwa: przy powiększonej czcionce systemowej font schodzi
+                    // w dół zamiast zawijać się na trzecią linię albo uciąć tekst wielokropkiem.
+                    AutoShrinkText(
                         text = mse?.label ?: stringResource(R.string.mse_gathering_data),
-                        style = MaterialTheme.typography.bodyLarge,
+                        baseStyle = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (mse != null) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.mse_tap_for_details),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.alpha(0.6f),
+                        )
+                    }
                 }
             }
         }
@@ -342,6 +385,13 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
             ScoreRationaleSheet(
                 rationale = data.rationale,
                 onDismiss = { showRationaleSheet = false },
+            )
+        }
+
+        if (showMseSheet && mse != null) {
+            MostSignificantEventSheet(
+                mse = mse,
+                onDismiss = { showMseSheet = false },
             )
         }
 
@@ -440,6 +490,129 @@ private fun ScoreRationaleSheet(
             )
         }
     }
+}
+
+/**
+ * WB-069: szczegóły MSE. Osobny arkusz od „Why this score?", bo to dwie różne rzeczy:
+ * `rationale` tłumaczy global_score bieżącego cyklu, a MSE to champion okna 24h, który
+ * może w tym cyklu w ogóle nie być w top-3. Sklejenie ich w jeden tap było źródłem
+ * zgłoszenia „tap score pokazuje opis innego wydarzenia".
+ *
+ * `summary` bywa puste na cache sprzed WB-064 — arkusz zostaje użyteczny (etykieta,
+ * score, czas wykrycia), po prostu bez akapitu opisu.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MostSignificantEventSheet(
+    mse: MostSignificantEvent,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SignificantMarkerDot(dotRadius = 3.dp, modifier = Modifier.padding(end = 8.dp))
+                Text(
+                    text = stringResource(R.string.mse_sheet_title),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = mse.label,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ScoreBadge(score = mse.score, sentiment = Tone.fromString(mse.sentiment))
+                Spacer(Modifier.size(10.dp))
+                val agoPhrase = detectedAgoFullPhrase(mse.detectedAt)
+                if (agoPhrase != null) {
+                    Text(
+                        text = stringResource(R.string.mse_sheet_detected, agoPhrase),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (mse.summary.isNotBlank()) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = mse.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            // Tytuł źródłowy RSS — tylko gdy wnosi coś ponad etykietę.
+            if (mse.title.isNotBlank() && !mse.title.equals(mse.label, ignoreCase = true)) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = mse.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.alpha(0.8f),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.score_rationale_footer),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * WB-067: tekst twardo ograniczony do [maxLines], który przy braku miejsca ZMNIEJSZA font
+ * zamiast zawijać się dalej albo ucinać wielokropkiem.
+ *
+ * Silnik pilnuje budżetu znaków (WB-065), ale nie zna skali czcionki systemowej: przy
+ * `fontScale` 1.3 nawet etykieta w budżecie potrzebuje trzech linii. Zmniejszamy font
+ * o 1 sp na próbę, aż tekst się zmieści albo dobijemy do [minFontSize]. Rysowanie jest
+ * wstrzymane do ustalenia rozmiaru, żeby nie było widać „skakania" tekstu.
+ */
+@Composable
+private fun AutoShrinkText(
+    text: String,
+    baseStyle: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 2,
+    minFontSize: TextUnit = 13.sp,
+) {
+    val baseSize = baseStyle.fontSize
+    // Styl bez konkretnego rozmiaru — nie ma czego zmniejszać, rysuj normalnie.
+    val canShrink = baseSize.isSp
+    var fontSize by remember(text, baseSize) { mutableStateOf(baseSize) }
+    var settled by remember(text, baseSize) { mutableStateOf(!canShrink) }
+
+    Text(
+        text = text,
+        style = if (canShrink) baseStyle.copy(fontSize = fontSize) else baseStyle,
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier.drawWithContent { if (settled) drawContent() },
+        onTextLayout = { result ->
+            if (!settled) {
+                if (result.hasVisualOverflow && fontSize.value > minFontSize.value) {
+                    fontSize = (fontSize.value - 1f).sp
+                } else {
+                    settled = true
+                }
+            }
+        },
+    )
 }
 
 @Composable

@@ -50,7 +50,6 @@ import com.worldbarometer.app.core.Level
 import com.worldbarometer.app.core.LevelPalette
 import com.worldbarometer.app.core.RelativeTime
 import com.worldbarometer.app.core.SignificantMarkerBitmap
-import com.worldbarometer.app.core.SignificantMarkerColor
 import com.worldbarometer.app.core.SparklineBitmap
 import com.worldbarometer.app.core.Tone
 import com.worldbarometer.app.data.model.MostSignificantEvent
@@ -312,6 +311,7 @@ private fun StandardWidgetContent(
             sparklineHeight = sparklineHeight,
             sparklineWidthPx = sparklineWidthPx,
             sparklineHeightPx = sparklineHeightPx,
+            mseDetectedAt = mse?.detectedAt,
         )
 
         Spacer(GlanceModifier.defaultWeight())
@@ -331,27 +331,29 @@ private fun StandardWidgetContent(
                 )
             }
 
-            // WB-060: blok "Most significant event" — ZAWSZE widoczny (marker kolorowany lub fallback).
+            // WB-060/WB-067: blok "Most significant event" — ZAWSZE widoczny, marker staly zolty.
             Spacer(GlanceModifier.height(4.dp))
             Box(
                 modifier = GlanceModifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val markerColor = mse?.let {
-                        LevelPalette.eventBadgeColor(it.score, Tone.fromString(it.sentiment))
-                    } ?: SignificantMarkerColor
-                    val markerBitmap = remember(markerColor) {
-                        SignificantMarkerBitmap.render(context, color = markerColor)
-                    }
+                    // WB-067: staly zolty (MseMarkerColor) — bez tonowania wg score/sentymentu.
+                    // Ponizej score 5 paleta zwracala brand teal i marker znikal w tle widgetu.
+                    val markerBitmap = remember { SignificantMarkerBitmap.render(context) }
                     Image(
                         provider = ImageProvider(markerBitmap),
                         contentDescription = null,
                         modifier = GlanceModifier.size(WidgetMarkerDotSize),
                     )
                     Spacer(GlanceModifier.width(4.dp))
+                    // WB-067: Standard (200-280dp) miesci ~31 znakow w 10sp — pelny naglowek
+                    // (22 zn.) plus czas juz nie wchodzi, wiec skrocony naglowek + samo "5h".
                     Text(
-                        text = context.getString(R.string.most_significant_event),
+                        text = mseHeaderWithAge(
+                            context.getString(R.string.most_significant_event_short),
+                            mseAgeShort(mse?.detectedAt),
+                        ),
                         style = TextStyle(color = white, fontSize = 10.sp),
                         maxLines = 1,
                     )
@@ -409,6 +411,7 @@ private fun WideWidgetContent(
             sparklineHeight = sparklineHeight,
             sparklineWidthPx = sparklineWidthPx,
             sparklineHeightPx = sparklineHeightPx,
+            mseDetectedAt = mse?.detectedAt,
         )
 
         Spacer(GlanceModifier.defaultWeight())
@@ -428,27 +431,28 @@ private fun WideWidgetContent(
                 )
             }
 
-            // WB-060: blok "Most significant event" — ZAWSZE widoczny (marker kolorowany lub fallback).
+            // WB-060/WB-067: blok "Most significant event" — ZAWSZE widoczny, marker staly zolty.
             Spacer(GlanceModifier.height(4.dp))
             Box(
                 modifier = GlanceModifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val markerColor = mse?.let {
-                        LevelPalette.eventBadgeColor(it.score, Tone.fromString(it.sentiment))
-                    } ?: SignificantMarkerColor
-                    val markerBitmap = remember(markerColor) {
-                        SignificantMarkerBitmap.render(context, color = markerColor)
-                    }
+                    // WB-067: staly zolty (MseMarkerColor) — bez tonowania wg score/sentymentu.
+                    // Ponizej score 5 paleta zwracala brand teal i marker znikal w tle widgetu.
+                    val markerBitmap = remember { SignificantMarkerBitmap.render(context) }
                     Image(
                         provider = ImageProvider(markerBitmap),
                         contentDescription = null,
                         modifier = GlanceModifier.size(WidgetMarkerDotSize),
                     )
                     Spacer(GlanceModifier.width(4.dp))
+                    // WB-067: Wide (>280dp) miesci pelny naglowek razem z "5h ago".
                     Text(
-                        text = context.getString(R.string.most_significant_event),
+                        text = mseHeaderWithAge(
+                            context.getString(R.string.most_significant_event),
+                            RelativeTime.formatShortAgo(mse?.detectedAt),
+                        ),
                         style = TextStyle(color = white, fontSize = 10.sp),
                         maxLines = 1,
                     )
@@ -542,6 +546,8 @@ private fun TopLabelSparklineRow(
     sparklineHeight: Dp,
     sparklineWidthPx: Int,
     sparklineHeightPx: Int,
+    /** WB-068: `most_significant_event.detected_at` — zolty odcinek osi czasu. */
+    mseDetectedAt: String? = null,
 ) {
     val context = LocalContext.current
     val white = ColorProvider(Color.White)
@@ -568,6 +574,8 @@ private fun TopLabelSparklineRow(
                     updatedAt,
                     sparklineWidthPx,
                     sparklineHeightPx,
+                    // WB-068: bez tego klucza bitmapa nie przerysuje sie przy zmianie MSE.
+                    mseDetectedAt,
                 ) {
                     SparklineBitmap.render(
                         context = context,
@@ -575,6 +583,7 @@ private fun TopLabelSparklineRow(
                         updatedAt = updatedAt,
                         widthPx = sparklineWidthPx,
                         heightPx = sparklineHeightPx,
+                        mseDetectedAt = mseDetectedAt,
                     )
                 }
                 Image(
@@ -620,6 +629,17 @@ private fun mseDetectedAgoPhrase(isoUtc: String?, nowMillis: Long = System.curre
         else -> "more than a day"
     }
 }
+
+/**
+ * WB-067: skrócony wiek MSE dla wariantu Standard — "5h" zamiast "5h ago".
+ * Wariant Wide ma miejsce na pełną formę, więc używa `RelativeTime.formatShortAgo` wprost.
+ */
+private fun mseAgeShort(isoUtc: String?, nowMillis: Long = System.currentTimeMillis()): String? =
+    RelativeTime.formatShortAgo(isoUtc, nowMillis)?.removeSuffix(" ago")
+
+/** WB-067: "Most significant · 5h"; bez czasu (stary cache bez detected_at) sam nagłówek. */
+private fun mseHeaderWithAge(header: String, age: String?): String =
+    if (age.isNullOrBlank()) header else "$header · $age"
 
 private fun buildWidgetContentDescription(
     context: Context,

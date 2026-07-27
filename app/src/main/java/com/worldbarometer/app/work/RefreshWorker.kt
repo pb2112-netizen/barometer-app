@@ -84,7 +84,11 @@ class RefreshWorker(
                 levelLabel = applicationContext.getString(
                     LevelPalette.labelRes(snapshot.level, snapshot.tone),
                 ),
-                summary = snapshot.data.shortSummary,
+                // WB-060: czytamy MSE wprost. `short_summary` to legacy mirror utrzymywany
+                // wyłącznie dla apek sprzed WB-060 i kiedyś zniknie z kontraktu — zostaje
+                // tylko jako zapas dla starego cache.
+                summary = snapshot.data.mostSignificantEvent?.label?.takeIf { it.isNotBlank() }
+                    ?: snapshot.data.shortSummary,
             )
             if (sent) settings.recordNotification(now)
         }

@@ -33,9 +33,21 @@ data class BarometerData(
 @Serializable
 data class MostSignificantEvent(
     val label: String = "",
+    /**
+     * WB-064: MSE's OWN impact description, frozen together with the peak (engine
+     * `peak_summary`). Before WB-064 the app had nothing to show but the lens-level
+     * `rationale`, which explains the CURRENT cycle's dominant event — a different story
+     * whenever the champion sits outside the visible top-3. Empty on pre-WB-064 cache.
+     */
+    val summary: String = "",
+    /** WB-064: champion's RSS title — lets the UI link MSE back to its card in topEvents. */
+    val title: String = "",
     val score: Double = 0.0,
     val sentiment: String? = null,
+    /** First time the topic was ever detected (WB-059) — drives the "5h ago" marker. */
     @SerialName("detected_at") val detectedAt: String? = null,
+    /** WB-068: moment of the peak, inside the 24h window; optional tick on the chart. */
+    @SerialName("peak_at") val peakAt: String? = null,
 )
 
 @Serializable
@@ -53,6 +65,8 @@ data class SourceLink(
 @Serializable
 data class TopEvent(
     val title: String = "",
+    /** WB-061: krótka etykieta EN per event (to samo brzmienie, co MSE dla championa). */
+    val label: String = "",
     val summary: String = "",
     val score: Double = 0.0,
     /** WB-013: sentyment eventu (negative/positive/neutral); null = stary cache -> NEUTRAL. */
