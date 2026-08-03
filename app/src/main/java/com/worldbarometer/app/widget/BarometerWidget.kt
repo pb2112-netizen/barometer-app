@@ -150,26 +150,23 @@ private fun WidgetContent(
         isStale = isStale,
     )
 
-    // WB-055: dim overlay when stale (simulates alpha 0.75 on gradient)
-    val staleOverlayColor = ColorProvider(Color(0x40000000))
+    // WB-072: dim overlay when stale, stacked as a second .background() on the SAME outer Box,
+    // applied BEFORE .padding() — so it covers the full widget bounds (with rounded corners via
+    // widget_stale_overlay.xml) instead of only the area inside WidgetPadding as a sharp-cornered
+    // child Box (WB-055's original approach, see WB-072 spec §2 for the "frame" glitch root cause).
+    var backgroundModifier = GlanceModifier
+        .fillMaxSize()
+        .background(ImageProvider(backgroundFor(level, tone)))
+    if (isStale) {
+        backgroundModifier = backgroundModifier.background(ImageProvider(R.drawable.widget_stale_overlay))
+    }
 
     Box(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .background(ImageProvider(backgroundFor(level, tone)))
+        modifier = backgroundModifier
             .semantics { contentDescription = widgetDescription }
             .clickable(actionStartActivity(Intent(context, MainActivity::class.java)))
             .padding(WidgetPadding),
     ) {
-        // Stale dim overlay
-        if (isStale) {
-            Box(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .background(staleOverlayColor),
-            ) {}
-        }
-
         when {
             widgetSize.width < 200.dp -> CompactWidgetContent(
                 scoreText = scoreText,

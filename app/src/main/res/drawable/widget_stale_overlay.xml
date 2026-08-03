@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WB-072: dim overlay for stale widget state. Same corner radius as widget_bg_*.xml
+     so the overlay follows the rounded background shape instead of rendering as a sharp
+     rectangle inside the padding (see WB-072 spec, causes the "frame" glitch). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="#40000000" />
+</shape>
