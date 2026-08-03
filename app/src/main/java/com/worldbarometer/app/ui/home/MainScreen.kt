@@ -179,24 +179,12 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         val enablePulse = !state.isStale && !state.isOffline && data.scoreHistory.size >= 3
         // a11y (WB-014 §4.6): ton niesiony tekstem opisu — TalkBack nie polega na kolorze.
         val scoreDescription = stringResource(LevelPalette.scoreDescriptionRes(level, tone), scoreText, levelLabel)
-        var showRationaleSheet by remember { mutableStateOf(false) }
         // WB-069: osobny arkusz dla MSE. Wcześniej jedyny tap (na cyfrę) pokazywał lensowe
         // `rationale`, czyli uzasadnienie global_score dla dominanta BIEŻĄCEGO cyklu — inne
         // wydarzenie niż MSE, ilekroć champion siedzi poza widocznym top-3.
         var showMseSheet by remember { mutableStateOf(false) }
-        val rationaleAvailable = data.rationale.isNotBlank()
-        val whyScoreCd = stringResource(R.string.why_this_score_cd)
-        val scoreRowModifier = if (rationaleAvailable) {
-            Modifier
-                .clickable { showRationaleSheet = true }
-                .semantics {
-                    role = Role.Button
-                    contentDescription = "$scoreDescription. $whyScoreCd"
-                }
-        } else {
-            Modifier.semantics(mergeDescendants = true) {
-                contentDescription = scoreDescription
-            }
+        val scoreRowModifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = scoreDescription
         }
         val heroShape = RoundedCornerShape(24.dp)
         val heroBaseColor = MaterialTheme.colorScheme.surface
@@ -254,16 +242,6 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                 }
 
                 LevelPill(label = levelLabel, color = levelColor)
-                // Hint tylko gdy tap faktycznie coś otwiera — przy pustym `rationale`
-                // (stary cache) cyfra nie jest klikalna, a podpowiedź i tak wisiała.
-                if (rationaleAvailable) {
-                    Text(
-                        text = stringResource(R.string.tap_score_for_details),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.alpha(0.6f),
-                    )
-                }
                 Spacer(Modifier.height(12.dp))
 
                 if (data.scoreHistory.size >= 2) {
@@ -381,13 +359,6 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
 
-        if (showRationaleSheet) {
-            ScoreRationaleSheet(
-                rationale = data.rationale,
-                onDismiss = { showRationaleSheet = false },
-            )
-        }
-
         if (showMseSheet && mse != null) {
             MostSignificantEventSheet(
                 mse = mse,
@@ -453,53 +424,13 @@ private fun EventsSection(events: List<TopEvent>) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ScoreRationaleSheet(
-    rationale: String,
-    onDismiss: () -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.why_this_score_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = rationale,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.score_rationale_footer),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 /**
- * WB-069: szczegóły MSE. Osobny arkusz od „Why this score?", bo to dwie różne rzeczy:
- * `rationale` tłumaczy global_score bieżącego cyklu, a MSE to champion okna 24h, który
- * może w tym cyklu w ogóle nie być w top-3. Sklejenie ich w jeden tap było źródłem
- * zgłoszenia „tap score pokazuje opis innego wydarzenia".
+ * WB-069: szczegóły MSE — champion okna 24h, który może w bieżącym cyklu w ogóle nie
+ * być w top-3 (dominant `rationale` opisuje coś innego niż MSE w takim przypadku).
  *
  * `summary` bywa puste na cache sprzed WB-064 — arkusz zostaje użyteczny (etykieta,
- * score, czas wykrycia), po prostu bez akapitu opisu.
+ * score, czas wykrycia), po prostu bez akapitu opisu. WB-073: `sourceLinks` analogicznie
+ * bywa puste na cache sprzed tego zadania — sekcja źródeł wtedy się nie pokazuje.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -507,6 +438,7 @@ private fun MostSignificantEventSheet(
     mse: MostSignificantEvent,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -560,6 +492,45 @@ private fun MostSignificantEventSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.alpha(0.8f),
                 )
+            }
+            // WB-073: link źródłowy — ten sam wzorzec co EventCard. Sticky w ledgerze
+            // (silnik), więc dostępny nawet gdy champion wypadł z bieżących top_events.
+            if (mse.sourceLinks.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.sources_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(2.dp))
+                mse.sourceLinks.forEach { link ->
+                    val readCd = stringResource(R.string.event_source_read_cd, link.name)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 40.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { openUrl(context, link.url) }
+                            .semantics { contentDescription = readCd },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = link.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(16.dp))
             Text(

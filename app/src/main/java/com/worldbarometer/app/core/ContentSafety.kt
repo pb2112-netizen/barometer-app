@@ -82,7 +82,7 @@ private fun TopEvent.sanitized(): TopEvent = copy(
     detectedAt = detectedAt?.sanitizeText(40),
 )
 
-/** WB-060/WB-064/WB-068: sanityzacja MSE — etykieta, własny opis, tytuł, znaczniki czasu. */
+/** WB-060/WB-064/WB-068/WB-073: sanityzacja MSE — etykieta, własny opis, tytuł, znaczniki czasu, linki źródłowe. */
 private fun MostSignificantEvent.sanitized(): MostSignificantEvent = copy(
     label = label.sanitizeText(MAX_SUMMARY),
     summary = summary.sanitizeText(MAX_EVENT_SUMMARY),
@@ -91,6 +91,11 @@ private fun MostSignificantEvent.sanitized(): MostSignificantEvent = copy(
     sentiment = sentiment?.sanitizeText(20),
     detectedAt = detectedAt?.sanitizeText(40),
     peakAt = peakAt?.sanitizeText(40),
+    sourceLinks = sourceLinks.asSequence()
+        .mapNotNull { it.sanitized() }
+        .distinctBy { it.url }
+        .take(MAX_SOURCE_LINKS)
+        .toList(),
 )
 
 fun BarometerData.sanitized(): BarometerData = copy(

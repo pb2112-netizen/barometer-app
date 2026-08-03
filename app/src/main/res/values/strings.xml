@@ -46,17 +46,17 @@
     <string name="sparkline_collecting_history">Collecting history — first chart in ~2h</string>
 
     <!-- WB-060: blok "Most significant event" (zastępuje last_significant_event / significant_peak_description) -->
-    <string name="most_significant_event">Most significant event</string>
+    <string name="most_significant_event">Most Significant Event</string>
     <!-- WB-067: krótszy nagłówek dla widgetu Standard (200–280dp) — pełny nie mieści się z czasem -->
-    <string name="most_significant_event_short">Most significant</string>
+    <string name="most_significant_event_short">Most Significant</string>
     <string name="mse_gathering_data">Gathering data…</string>
-    <string name="mse_description">Most significant event: %1$s, score %2$s, detected %3$s ago</string>
+    <string name="mse_description">Most Significant Event: %1$s, score %2$s, detected %3$s ago</string>
     <!-- WB-067: widoczny znacznik czasu przy MSE ("· 5h ago"); dotąd był tylko w opisie a11y -->
     <string name="mse_age_separator">·</string>
     <!-- WB-068: a11y dla podświetlonego odcinka osi czasu wykresu -->
-    <string name="mse_span_a11y">Most significant event has been running for %1$s.</string>
+    <string name="mse_span_a11y">Most Significant Event has been running for %1$s.</string>
     <!-- WB-069: arkusz szczegółów MSE (tap na blok) -->
-    <string name="mse_sheet_title">Most significant event</string>
+    <string name="mse_sheet_title">Most Significant Event</string>
     <string name="mse_sheet_score">Score %1$s / 10</string>
     <string name="mse_sheet_detected">Detected %1$s</string>
     <string name="mse_sheet_cd">Most significant event. Opens details</string>
@@ -93,10 +93,6 @@
     <string name="cd_refresh">Refresh</string>
     <string name="cd_settings">Settings</string>
 
-    <!-- WB-057: tap score → rationale bottom sheet -->
-    <string name="why_this_score_title">Why this score?</string>
-    <string name="why_this_score_cd">Why this score? Opens explanation</string>
-    <string name="tap_score_for_details">Tap score for details</string>
     <string name="score_rationale_footer">AI-generated assessment</string>
     <string name="notification_channel_alerts">Barometer alerts</string>
     <string name="notification_channel_alerts_description">Notifications when the threat level rises above your threshold.</string>

@@ -48,6 +48,13 @@ data class MostSignificantEvent(
     @SerialName("detected_at") val detectedAt: String? = null,
     /** WB-068: moment of the peak, inside the 24h window; optional tick on the chart. */
     @SerialName("peak_at") val peakAt: String? = null,
+    /**
+     * WB-073: sticky source link(s), frozen in the ledger at peak time (engine
+     * `peak_source_links`) — same pattern as `summary`/`peak_summary`. The champion can sit
+     * outside the current cycle's RSS window, so this is NOT re-matched live like
+     * `TopEvent.sourceLinks`.
+     */
+    @SerialName("source_links") val sourceLinks: List<SourceLink> = emptyList(),
 )
 
 @Serializable

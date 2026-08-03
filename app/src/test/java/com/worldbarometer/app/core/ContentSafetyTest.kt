@@ -3,6 +3,7 @@ package com.worldbarometer.app.core
 import com.worldbarometer.app.data.model.BarometerData
 import com.worldbarometer.app.data.model.MostSignificantEvent
 import com.worldbarometer.app.data.model.ScoreHistoryPoint
+import com.worldbarometer.app.data.model.SourceLink
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -72,5 +73,33 @@ class ContentSafetyTest {
         assertEquals(10.0, data.mostSignificantEvent!!.score, 0.001)
         assertEquals("Breaking news headline", data.mostSignificantEvent!!.label)
         assertEquals("negative", data.mostSignificantEvent!!.sentiment)
+    }
+
+    // --- WB-073: most_significant_event.source_links ---
+
+    @Test
+    fun sanitized_keepsEmptySourceLinks_onMostSignificantEvent_whenAbsent() {
+        val mse = MostSignificantEvent(label = "Old cache event")
+        val data = BarometerData(mostSignificantEvent = mse).sanitized()
+        assertTrue(data.mostSignificantEvent!!.sourceLinks.isEmpty())
+    }
+
+    @Test
+    fun sanitized_dropsSourceLinksWithBlankNameOrDisallowedScheme_onMostSignificantEvent() {
+        // Uses only non-https/blank-name cases: android.net.Uri isn't mocked in plain JUnit
+        // (no Robolectric in this module), so real https:// hosts can't be exercised here —
+        // SourceUrlPolicy.isAllowed() short-circuits before Uri.parse() for these inputs.
+        val mse = MostSignificantEvent(
+            label = "Breaking news",
+            sourceLinks = listOf(
+                SourceLink(name = "Bad scheme", url = "javascript:alert(1)"),
+                SourceLink(name = "Insecure", url = "http://example.com/b"),
+                SourceLink(name = "", url = "https://example.com/c"),
+                SourceLink(name = "Too long url", url = "https://" + "a".repeat(2050)),
+            ),
+        )
+        val sanitized = BarometerData(mostSignificantEvent = mse).sanitized().mostSignificantEvent!!
+
+        assertTrue(sanitized.sourceLinks.isEmpty())
     }
 }
