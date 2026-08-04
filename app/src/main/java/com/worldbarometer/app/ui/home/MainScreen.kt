@@ -251,7 +251,7 @@ private fun BarometerContent(state: HomeUiState, onOpenSettings: () -> Unit) {
                         lastPointColor = levelColor,
                         enablePulse = enablePulse,
                         contentDescription = sparklineDescription,
-                        // WB-068: żółty odcinek osi czasu = jak długo trwa bieżące MSE.
+                        // WB-074: żółty punkt na osi czasu = pierwsze wykrycie MSE.
                         mseDetectedAt = mse?.detectedAt,
                         modifier = Modifier.fillMaxWidth(DASHBOARD_CHART_WIDTH_FRACTION),
                     )

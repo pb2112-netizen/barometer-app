@@ -50,10 +50,8 @@ import kotlin.math.roundToInt
  */
 val MseMarkerColor = Color(0xFFEAB308)
 
-/** WB-068: how the MSE stretch is drawn over the neutral time axis. */
-private const val MSE_AXIS_STROKE_MULTIPLIER = 3f
-/** WB-068: height of the tick marking the exact start of the MSE, in axis-stroke units. */
-private const val MSE_START_TICK_MULTIPLIER = 5f
+/** WB-074: alfa znacznika MSE przypiętego do lewej krawędzi (detected_at > 24h temu). */
+private const val MSE_MARKER_CLAMPED_ALPHA = 0.35f
 
 /** Static halo matching pulsing “now” marker at peak alpha (0.85 × 0.45). */
 private const val MARKER_HALO_ALPHA = 0.3825f
@@ -199,40 +197,34 @@ object Sparkline {
     }
 
     /**
-     * WB-068: how long the current MSE has been running, expressed as a fraction of the
-     * visible 24h window. [startRatio] .. [endRatio] map straight onto [scoreToPlotX].
+     * WB-074: punkt pierwszego wykrycia MSE na osi czasu (zastępuje pasek czasu trwania
+     * z WB-068). [xRatio] mapuje się przez [scoreToPlotX] identycznie jak dotychczasowy
+     * `MseSpan.startRatio`.
      *
-     * The span always ends at "now" (the right edge): the MSE is by definition the reigning
-     * champion, so it is still live. It restarts on its own when the champion changes,
-     * because `detectedAt` changes with it — no extra state to keep.
-     *
-     * [startsBeforeWindow] is true when the topic was first detected before the visible
-     * window. That is common after WB-062 (the MSE window runs on `peak_at`, while
-     * `detected_at` stays the FIRST ever detection). The caller then skips the start tick,
-     * so a bar running into the left edge reads as "began earlier" instead of pretending
-     * the story started exactly 24h ago.
+     * [isClampedToWindowStart] = true, gdy `detected_at` wypada PRZED widocznym oknem 24h —
+     * to jest częste po WB-062 (okno MSE liczy się od `peak_at`, a `detected_at` to wciąż
+     * PIERWSZE wykrycie). UI rysuje wtedy znacznik na lewej krawędzi z obniżoną alfą (sygnał
+     * "zaczęło się wcześniej", nie dokładna historyczna pozycja).
      */
-    data class MseSpan(
-        val startRatio: Float,
-        val endRatio: Float,
-        val startsBeforeWindow: Boolean,
+    data class MseMarkerPosition(
+        val xRatio: Float,
+        val isClampedToWindowStart: Boolean,
     )
 
-    fun mseSpan(
+    fun mseMarkerPosition(
         detectedAtIso: String?,
         windowEnd: Instant,
         windowHours: Long = DISPLAY_WINDOW_HOURS,
-    ): MseSpan? {
+    ): MseMarkerPosition? {
         val detected = parseInstant(detectedAtIso.orEmpty()) ?: return null
         if (detected.isAfter(windowEnd)) return null
         val windowStart = windowEnd.minus(Duration.ofHours(windowHours))
         val windowMillis = Duration.ofHours(windowHours).toMillis().toFloat().coerceAtLeast(1f)
-        val startsBeforeWindow = detected.isBefore(windowStart)
+        val isClamped = detected.isBefore(windowStart)
         val rawRatio = (detected.toEpochMilli() - windowStart.toEpochMilli()) / windowMillis
-        return MseSpan(
-            startRatio = rawRatio.coerceIn(0f, 1f),
-            endRatio = 1f,
-            startsBeforeWindow = startsBeforeWindow,
+        return MseMarkerPosition(
+            xRatio = rawRatio.coerceIn(0f, 1f),
+            isClampedToWindowStart = isClamped,
         )
     }
 
@@ -306,7 +298,7 @@ fun SparklineChart(
     height: Dp = 56.dp,
     lineColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
     axisColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
-    /** WB-068: `most_significant_event.detected_at` — highlights how long the MSE has run. */
+    /** WB-074: `most_significant_event.detected_at` — pozycja żółtego punktu na osi czasu. */
     mseDetectedAt: String? = null,
 ) {
     val density = LocalDensity.current
@@ -346,28 +338,16 @@ fun SparklineChart(
         // WB-060: okno renderowania 24h + lekkie wygladzenie (zachowuje realne skoki).
         val end = Sparkline.windowEnd(history, updatedAt)
 
-        // WB-068: żółty odcinek osi czasu = jak długo trwa bieżące MSE.
-        Sparkline.mseSpan(mseDetectedAt, end)?.let { span ->
-            val x0 = plotLeft + Sparkline.scoreToPlotX(span.startRatio, plotWidth)
-            val x1 = plotLeft + Sparkline.scoreToPlotX(span.endRatio, plotWidth)
-            drawLine(
-                color = MseMarkerColor,
-                start = Offset(x0, plotBottom),
-                end = Offset(x1, plotBottom),
-                strokeWidth = axisWidth * MSE_AXIS_STROKE_MULTIPLIER,
-                cap = StrokeCap.Butt,
+        // WB-074: żółty punkt na osi czasu = pierwsze wykrycie MSE (dot+halo, styl SignificantMarkerDot).
+        Sparkline.mseMarkerPosition(mseDetectedAt, end)?.let { marker ->
+            val alpha = if (marker.isClampedToWindowStart) MSE_MARKER_CLAMPED_ALPHA else 1f
+            val center = Offset(plotLeft + Sparkline.scoreToPlotX(marker.xRatio, plotWidth), plotBottom)
+            drawCircle(
+                color = MseMarkerColor.copy(alpha = MARKER_HALO_ALPHA * alpha),
+                radius = pointRadius * MARKER_HALO_RADIUS_MULTIPLIER,
+                center = center,
             )
-            // Pionowy znacznik dokładnego początku — pomijany, gdy temat zaczął się przed
-            // oknem: pasek dobity do lewej krawędzi sam czyta się jako "ciągnie się dłużej".
-            if (!span.startsBeforeWindow) {
-                drawLine(
-                    color = MseMarkerColor,
-                    start = Offset(x0, plotBottom),
-                    end = Offset(x0, plotBottom - axisWidth * MSE_START_TICK_MULTIPLIER),
-                    strokeWidth = axisWidth * MSE_AXIS_STROKE_MULTIPLIER,
-                    cap = StrokeCap.Butt,
-                )
-            }
+            drawCircle(color = MseMarkerColor.copy(alpha = alpha), radius = pointRadius, center = center)
         }
 
         val windowed = Sparkline.pointsInWindow(history, end)
@@ -437,7 +417,7 @@ object SparklineBitmap {
         heightPx: Int,
         lastPointColor: Color = Color.White,
         config: Sparkline.RenderConfig = widgetConfig,
-        /** WB-068: `most_significant_event.detected_at` — highlights how long the MSE has run. */
+        /** WB-074: `most_significant_event.detected_at` — pozycja żółtego punktu na osi czasu. */
         mseDetectedAt: String? = null,
     ): Bitmap {
         val safeWidth = widthPx.coerceAtLeast(1)
@@ -470,22 +450,21 @@ object SparklineBitmap {
         // WB-060: okno renderowania 24h + lekkie wygladzenie (zachowuje realne skoki).
         val end = Sparkline.windowEnd(history, updatedAt)
 
-        // WB-068: żółty odcinek osi czasu = jak długo trwa bieżące MSE (parytet z dashboardem).
-        Sparkline.mseSpan(mseDetectedAt, end)?.let { span ->
-            val msePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = MseMarkerColor.toArgb()
-                strokeWidth = axisWidth * MSE_AXIS_STROKE_MULTIPLIER
-                style = Paint.Style.STROKE
-                strokeCap = Paint.Cap.BUTT
+        // WB-074: żółty punkt na osi czasu = pierwsze wykrycie MSE (parytet z dashboardem).
+        Sparkline.mseMarkerPosition(mseDetectedAt, end)?.let { marker ->
+            val alpha = if (marker.isClampedToWindowStart) MSE_MARKER_CLAMPED_ALPHA else 1f
+            val cx = plotLeft + Sparkline.scoreToPlotX(marker.xRatio, plotWidth)
+            val cy = plotBottom
+            val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = MseMarkerColor.copy(alpha = MARKER_HALO_ALPHA * alpha).toArgb()
+                style = Paint.Style.FILL
             }
-            val x0 = plotLeft + Sparkline.scoreToPlotX(span.startRatio, plotWidth)
-            val x1 = plotLeft + Sparkline.scoreToPlotX(span.endRatio, plotWidth)
-            canvas.drawLine(x0, plotBottom, x1, plotBottom, msePaint)
-            if (!span.startsBeforeWindow) {
-                canvas.drawLine(
-                    x0, plotBottom, x0, plotBottom - axisWidth * MSE_START_TICK_MULTIPLIER, msePaint,
-                )
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = MseMarkerColor.copy(alpha = alpha).toArgb()
+                style = Paint.Style.FILL
             }
+            canvas.drawCircle(cx, cy, pointRadius * MARKER_HALO_RADIUS_MULTIPLIER, haloPaint)
+            canvas.drawCircle(cx, cy, pointRadius, dotPaint)
         }
         val windowed = Sparkline.pointsInWindow(history, end)
         val smoothedHistory = Sparkline.smoothed(windowed)

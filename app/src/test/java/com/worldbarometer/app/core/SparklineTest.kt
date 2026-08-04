@@ -76,49 +76,43 @@ class SparklineTest {
         assertEquals(9.0, smoothed.last().score, 0.0001)
     }
 
-    // --- WB-068: mseSpan (zolty odcinek osi czasu = jak dlugo trwa MSE) ---
+    // --- WB-074: mseMarkerPosition (zolty punkt na osi czasu = pierwsze wykrycie MSE) ---
 
     private val windowEnd: Instant = Instant.parse("2026-06-02T10:00:00Z")
 
     @Test
-    fun mseSpan_isNull_whenDetectedAtMissingOrInvalid() {
-        assertNull(Sparkline.mseSpan(null, windowEnd))
-        assertNull(Sparkline.mseSpan("", windowEnd))
-        assertNull(Sparkline.mseSpan("nie-iso", windowEnd))
+    fun mseMarkerPosition_isNull_whenDetectedAtMissingOrInvalid() {
+        assertNull(Sparkline.mseMarkerPosition(null, windowEnd))
+        assertNull(Sparkline.mseMarkerPosition("", windowEnd))
+        assertNull(Sparkline.mseMarkerPosition("nie-iso", windowEnd))
     }
 
     @Test
-    fun mseSpan_isNull_whenDetectedAtIsInTheFuture() {
-        assertNull(Sparkline.mseSpan("2026-06-02T11:00:00Z", windowEnd))
+    fun mseMarkerPosition_isNull_whenDetectedAtIsInTheFuture() {
+        assertNull(Sparkline.mseMarkerPosition("2026-06-02T11:00:00Z", windowEnd))
     }
 
     @Test
-    fun mseSpan_alwaysEndsAtNow() {
-        val span = Sparkline.mseSpan("2026-06-02T04:00:00Z", windowEnd)!!
-        assertEquals(1f, span.endRatio, 0.0001f)
-    }
-
-    @Test
-    fun mseSpan_startsHalfwayForTwelveHourOldEvent() {
+    fun mseMarkerPosition_isHalfwayForTwelveHourOldEvent() {
         // 12h przed koncem okna 24h -> polowa szerokosci wykresu
-        val span = Sparkline.mseSpan("2026-06-01T22:00:00Z", windowEnd)!!
-        assertEquals(0.5f, span.startRatio, 0.0001f)
-        assertTrue(!span.startsBeforeWindow)
+        val marker = Sparkline.mseMarkerPosition("2026-06-01T22:00:00Z", windowEnd)!!
+        assertEquals(0.5f, marker.xRatio, 0.0001f)
+        assertTrue(!marker.isClampedToWindowStart)
     }
 
     @Test
-    fun mseSpan_clampsToLeftEdge_whenTopicStartedBeforeWindow() {
-        // Po WB-062 detected_at championa rutynowo przekracza 24h — pasek dobija do krawedzi
-        // i oznacza sie flaga, zeby UI pominelo znacznik "dokladnego poczatku".
-        val span = Sparkline.mseSpan("2026-05-30T10:00:00Z", windowEnd)!!
-        assertEquals(0f, span.startRatio, 0.0001f)
-        assertTrue(span.startsBeforeWindow)
+    fun mseMarkerPosition_clampsToLeftEdge_whenTopicStartedBeforeWindow() {
+        // Po WB-062 detected_at championa rutynowo przekracza 24h — znacznik przypinany jest
+        // do lewej krawedzi i oznaczany flaga, zeby UI narysowalo go wyblaklym (WB-074).
+        val marker = Sparkline.mseMarkerPosition("2026-05-30T10:00:00Z", windowEnd)!!
+        assertEquals(0f, marker.xRatio, 0.0001f)
+        assertTrue(marker.isClampedToWindowStart)
     }
 
     @Test
-    fun mseSpan_atExactWindowStart_isNotMarkedAsBeforeWindow() {
-        val span = Sparkline.mseSpan("2026-06-01T10:00:00Z", windowEnd)!!
-        assertEquals(0f, span.startRatio, 0.0001f)
-        assertTrue(!span.startsBeforeWindow)
+    fun mseMarkerPosition_atExactWindowStart_isNotMarkedAsBeforeWindow() {
+        val marker = Sparkline.mseMarkerPosition("2026-06-01T10:00:00Z", windowEnd)!!
+        assertEquals(0f, marker.xRatio, 0.0001f)
+        assertTrue(!marker.isClampedToWindowStart)
     }
 }

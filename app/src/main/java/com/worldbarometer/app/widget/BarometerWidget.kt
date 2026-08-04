@@ -543,7 +543,7 @@ private fun TopLabelSparklineRow(
     sparklineHeight: Dp,
     sparklineWidthPx: Int,
     sparklineHeightPx: Int,
-    /** WB-068: `most_significant_event.detected_at` — zolty odcinek osi czasu. */
+    /** WB-074: `most_significant_event.detected_at` — zolty punkt na osi czasu. */
     mseDetectedAt: String? = null,
 ) {
     val context = LocalContext.current
@@ -571,7 +571,7 @@ private fun TopLabelSparklineRow(
                     updatedAt,
                     sparklineWidthPx,
                     sparklineHeightPx,
-                    // WB-068: bez tego klucza bitmapa nie przerysuje sie przy zmianie MSE.
+                    // WB-074: bez tego klucza bitmapa nie przerysuje sie przy zmianie MSE.
                     mseDetectedAt,
                 ) {
                     SparklineBitmap.render(
